@@ -11,13 +11,15 @@ npm run dev
 
 Abre [http://localhost:3000](http://localhost:3000).
 
-## Conectar Convex (cuando toque)
+## Convex
+
+Ya conectado al proyecto **vibe-crm** (equipo `jose-angel-talavera-martinez` en Convex). `.env.local` tiene las credenciales del dev deployment (no se versiona). Para desarrollar contra Convex:
 
 ```bash
 npx convex dev
 ```
 
-La primera vez abre el navegador para crear/enlazar el proyecto en tu cuenta de Convex y genera `.env.local` con `CONVEX_DEPLOYMENT` y `NEXT_PUBLIC_CONVEX_URL` (ver `.env.example`).
+Déjalo corriendo en una terminal aparte mientras trabajas — sincroniza el esquema y las funciones en caliente en cuanto empecemos a añadirlas a `convex/`. Panel del proyecto: https://dashboard.convex.dev/t/jose-angel-talavera-martinez/vibe-crm
 
 ## Desplegar
 

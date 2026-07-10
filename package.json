@@ -10,16 +10,10 @@
     "convex:dev": "convex dev"
   },
   "dependencies": {
-    "@convex-dev/auth": "^0.0.94",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
     "convex": "^1.42.1",
-    "date-fns": "^4.4.0",
-    "lucide-react": "^1.24.0",
     "next": "16.2.10",
     "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "tailwind-merge": "^3.6.0"
+    "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

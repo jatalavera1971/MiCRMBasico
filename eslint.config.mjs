@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generado por Convex, no es código de la app.
+    "convex/_generated/**",
+    // Fuente de diseño externa/untracked (ver .gitignore), no es código de la app.
+    "design/**",
   ]),
 ]);
 

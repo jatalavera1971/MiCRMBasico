@@ -53,3 +53,4 @@ next-env.d.ts
 # diseño: mantenemos design.md como referencia, pero no el export pesado del prototipo
 /design/uploads/
 /design/*.zip
+/design/CRM Prototype Paginas/

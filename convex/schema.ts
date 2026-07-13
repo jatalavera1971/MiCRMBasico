@@ -16,9 +16,17 @@ export default defineSchema({
     // undefined = nunca contactado. Ver convex/model/clientes.ts: listarClientesInactivos
     // excluye estos clientes explícitamente en código (JOS-25), no confía en el índice.
     fecha_ultimo_contacto: v.optional(v.number()),
+    // JOS-12 (alta de cliente): email normalizado a minúsculas en el servidor.
+    email: v.string(),
+    telefono: v.optional(v.string()),
+    // JOS-42/JOS-43: prioridad obligatoria, default "media" fijado en la mutation crearCliente.
+    prioridad: v.union(v.literal("alta"), v.literal("media"), v.literal("baja")),
+    // Epoch ms, asignado por el servidor al crear (crearCliente). No editable por el cliente.
+    fecha_alta: v.number(),
   })
     .index("by_fase", ["fase"])
-    .index("by_fecha_ultimo_contacto", ["fecha_ultimo_contacto"]),
+    .index("by_fecha_ultimo_contacto", ["fecha_ultimo_contacto"])
+    .index("by_fecha_alta", ["fecha_alta"]),
 
   recordatorios: defineTable({
     cliente_id: v.id("clientes"),

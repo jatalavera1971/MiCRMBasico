@@ -31,12 +31,67 @@
   --color-warning-border: #fde68a;
   --color-warning-text: #92400e;
 
+  /* JOS-42/JOS-43: colores de prioridad, verificados en
+   * _ds_ref/tokens/colors.css:45-51 y en priorityStyle() de crm-app.js. */
+  --color-priority-high-bg: #fee2e2;
+  --color-priority-high-text: #b91c1c;
+  --color-priority-medium-bg: #fef3c7;
+  --color-priority-medium-text: #b45309;
+  --color-priority-low-bg: #dcfce7;
+  --color-priority-low-text: #15803d;
+
+  /* No existe un token de error dedicado en _ds_ref/colors.css; se reutiliza el
+   * mismo rojo que priority-high (JOS-12: mensajes de validación del formulario). */
+  --color-error-text: #b91c1c;
+
+  /* _ds_ref/tokens/colors.css:71 — foco de inputs (JOS-12), mejora de accesibilidad
+   * sobre sheetNewClient(), que no tiene estados de foco en el prototipo. */
+  --color-focus-ring: #bbf7d0;
+
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-full: 9999px;
+  /* JOS-12: esquinas superiores del sheet de alta en móvil. El código real de
+   * sheetNewClient() usa 16px; _ds_ref/elevation.css documenta 24px para "bottom
+   * sheet top corners" pero no coincide con la implementación — se usa el valor
+   * del código, no el de la doc. */
+  --radius-xl: 16px;
 }
 
 body {
   background: var(--color-bg-app);
   color: var(--color-text-primary);
+}
+
+/*
+ * JOS-12: animación de entrada del diálogo de alta de cliente, transcrita de
+ * renderSheetOverlay()/protoSheetUp en crm-app.js (220ms slide-up). En
+ * escritorio (>=768px, mismo breakpoint que Sidebar/TabBar) se sustituye por un
+ * fade-in simple, ya que ahí el diálogo es un modal centrado, no un sheet.
+ * Media query manual en vez de un modificador `md:` de Tailwind porque son
+ * clases CSS propias, no utilidades generadas por @theme.
+ */
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes dialog-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.dialog-card-anim {
+  animation: sheet-up 220ms ease-out;
+}
+@media (min-width: 768px) {
+  .dialog-card-anim {
+    animation: dialog-fade-in 150ms ease-out;
+  }
 }

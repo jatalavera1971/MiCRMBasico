@@ -30,30 +30,45 @@ export const seedDemoData = internalMutation({
       empresa: "Mipymes SL",
       fase: "lead",
       fecha_ultimo_contacto: daysAgoMs(1),
+      email: "ana.garcia@example.com",
+      prioridad: "alta",
+      fecha_alta: daysAgoMs(15),
     });
     const pedroId = await ctx.db.insert("clientes", {
       nombre: "Pedro Mora",
       empresa: "TechCorp SA",
       fase: "cualificacion",
       fecha_ultimo_contacto: daysAgoMs(2),
+      email: "pedro.mora@example.com",
+      prioridad: "media",
+      fecha_alta: daysAgoMs(20),
     });
     const sofiaId = await ctx.db.insert("clientes", {
       nombre: "Sofía Blanco",
       empresa: "Creativa IO",
       fase: "propuesta_enviada",
       fecha_ultimo_contacto: daysAgoMs(3),
+      email: "sofia.blanco@example.com",
+      prioridad: "alta",
+      fecha_alta: daysAgoMs(10),
     });
     const carlosId = await ctx.db.insert("clientes", {
       nombre: "Carlos Ruiz",
       empresa: "Ruiz Asociados",
       fase: "negociacion",
       fecha_ultimo_contacto: daysAgoMs(10),
+      email: "carlos.ruiz@example.com",
+      prioridad: "media",
+      fecha_alta: daysAgoMs(25),
     });
     const lauraId = await ctx.db.insert("clientes", {
       nombre: "Laura Jiménez",
       empresa: "Estudio Diseño",
       fase: "cerrado",
       fecha_ultimo_contacto: daysAgoMs(20),
+      email: "laura.jimenez@example.com",
+      prioridad: "baja",
+      fecha_alta: daysAgoMs(40),
     });
     await ctx.db.insert("clientes", {
       nombre: "Miguel Torres",
@@ -61,6 +76,9 @@ export const seedDemoData = internalMutation({
       fase: "cerrado",
       // fecha_ultimo_contacto omitido a propósito: nunca contactado, no debe
       // aparecer como inactivo (JOS-25).
+      email: "miguel.torres@example.com",
+      prioridad: "baja",
+      fecha_alta: daysAgoMs(30),
     });
 
     await ctx.db.insert("recordatorios", {

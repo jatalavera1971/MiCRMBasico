@@ -23,6 +23,18 @@ export default defineSchema({
     prioridad: v.union(v.literal("alta"), v.literal("media"), v.literal("baja")),
     // Epoch ms, asignado por el servidor al crear (crearCliente). No editable por el cliente.
     fecha_alta: v.number(),
+    // JOS-10: opcional a propósito, no obligatorio. crearCliente fija "email" por
+    // defecto en cada alta nueva, pero no hay forma de cambiarlo hasta que exista
+    // P3/edición — y no se puede asumir que todos los documentos existentes (dev
+    // o prod) ya lo tengan, así que un valor obligatorio rompería el push del schema.
+    canal_preferido: v.optional(
+      v.union(
+        v.literal("telefono"),
+        v.literal("whatsapp"),
+        v.literal("email"),
+        v.literal("reunion"),
+      ),
+    ),
   })
     .index("by_fase", ["fase"])
     .index("by_fecha_ultimo_contacto", ["fecha_ultimo_contacto"])

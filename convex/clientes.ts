@@ -37,10 +37,14 @@ export const crearCliente = mutation({
 
 // Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
 // construido todavía. Desplegada igualmente en Railway con este riesgo aceptado
-// explícitamente desde 2026-07-12 — ver README.md. Expone `email` (dato personal)
-// públicamente hasta que exista JOS-60/61, aunque solo devuelve los 4 campos
-// proyectados por listarClientes (ver convex/model/clientes.ts), nunca el
-// documento completo.
+// explícitamente desde 2026-07-12 — ver README.md. JOS-10/13/45 (13 jul 2026)
+// ampliaron su proyección: además de `nombre`/`email`/`prioridad` ahora también
+// expone `telefono`, `empresa`, `canal_preferido`, `fase` y `fecha_ultimo_contacto`
+// (necesarios para buscar/mostrar/ordenar en la pantalla "Clientes") — sigue
+// proyectando solo esos 9 campos, nunca el documento completo, pero ya no son
+// "solo 4 campos". La búsqueda de texto que consume esta query en el frontend
+// solo cubre los hasta 500 clientes que devuelve `.take(500)`, no toda la tabla
+// (ver convex/model/clientes.ts).
 export const listarClientes = query({
   args: {},
   handler: async (ctx) => {

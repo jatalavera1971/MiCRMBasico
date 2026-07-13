@@ -106,25 +106,42 @@ export async function crearCliente(
     fecha_alta: Date.now(),
     // fecha_ultimo_contacto se omite a propósito: un alta no es un contacto
     // registrado, sigue "nunca contactado" a efectos de JOS-25.
+    // JOS-10: valor de relleno hasta que exista P3/edición para cambiarlo de
+    // verdad — mismo criterio que el prototipo, que hardcodea "Email" al crear.
+    canal_preferido: "email",
   });
 }
 
-// JOS-12: solo para dar destino real al botón "+" y verificar el alta
-// end-to-end — no implementa la lista de JOS-10 (sin búsqueda/filtros/orden).
-// Proyección explícita (misma razón que listarClientesInactivos arriba): esta
-// query es pública y sin auth, así que solo devuelve lo que consume la lista
-// mínima, nunca el documento completo (telefono/empresa/fase/fecha_ultimo_contacto/
-// fecha_alta quedarían expuestos si no).
+// JOS-10/13/45: query real de la pantalla "Clientes" (P2) — el filtrado por
+// texto/prioridad y el orden por prioridad+antigüedad de contacto se hacen en
+// el cliente (ver ClientesListClient.tsx), aquí solo se acota el volumen y se
+// proyecta. Proyección explícita (misma razón que listarClientesInactivos
+// arriba): esta query es pública y sin auth, así que solo devuelve los 9 campos
+// que P2 consume de verdad — nunca fecha_alta (no se usa aquí), pero SÍ
+// telefono/empresa/canal_preferido/fase/fecha_ultimo_contacto, que antes de
+// esta pantalla no se exponían. Es un escalón adicional del riesgo de PII ya
+// aceptado (ver README) — telefono y fecha_ultimo_contacto (actividad
+// comercial) quedan legibles públicamente hasta JOS-60/61, porque JOS-13
+// necesita buscar por teléfono y JOS-45 necesita ordenar por último contacto.
+// Tope de seguridad `.take(500)`: no es paginación real (JOS-31 sigue
+// pendiente) — busca sobre los hasta 500 clientes cargados, no sobre toda la
+// tabla; si la tabla supera ese tamaño (posible porque crearCliente es pública
+// y sin rate-limit) la búsqueda deja de cubrir el resto sin que se note.
 export async function listarClientes(ctx: QueryCtx) {
   const clientes = await ctx.db
     .query("clientes")
     .withIndex("by_fecha_alta")
     .order("desc")
-    .take(200);
+    .take(500);
   return clientes.map((c) => ({
     _id: c._id,
     nombre: c.nombre,
     email: c.email,
+    telefono: c.telefono,
+    empresa: c.empresa,
+    canal_preferido: c.canal_preferido,
+    fase: c.fase,
     prioridad: c.prioridad,
+    fecha_ultimo_contacto: c.fecha_ultimo_contacto,
   }));
 }

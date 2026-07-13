@@ -33,6 +33,7 @@ export const seedDemoData = internalMutation({
       email: "ana.garcia@example.com",
       prioridad: "alta",
       fecha_alta: daysAgoMs(15),
+      canal_preferido: "telefono",
     });
     const pedroId = await ctx.db.insert("clientes", {
       nombre: "Pedro Mora",
@@ -42,6 +43,7 @@ export const seedDemoData = internalMutation({
       email: "pedro.mora@example.com",
       prioridad: "media",
       fecha_alta: daysAgoMs(20),
+      canal_preferido: "whatsapp",
     });
     const sofiaId = await ctx.db.insert("clientes", {
       nombre: "Sofía Blanco",
@@ -51,6 +53,7 @@ export const seedDemoData = internalMutation({
       email: "sofia.blanco@example.com",
       prioridad: "alta",
       fecha_alta: daysAgoMs(10),
+      canal_preferido: "email",
     });
     const carlosId = await ctx.db.insert("clientes", {
       nombre: "Carlos Ruiz",
@@ -60,6 +63,7 @@ export const seedDemoData = internalMutation({
       email: "carlos.ruiz@example.com",
       prioridad: "media",
       fecha_alta: daysAgoMs(25),
+      canal_preferido: "reunion",
     });
     const lauraId = await ctx.db.insert("clientes", {
       nombre: "Laura Jiménez",
@@ -69,6 +73,7 @@ export const seedDemoData = internalMutation({
       email: "laura.jimenez@example.com",
       prioridad: "baja",
       fecha_alta: daysAgoMs(40),
+      canal_preferido: "telefono",
     });
     await ctx.db.insert("clientes", {
       nombre: "Miguel Torres",
@@ -79,6 +84,7 @@ export const seedDemoData = internalMutation({
       email: "miguel.torres@example.com",
       prioridad: "baja",
       fecha_alta: daysAgoMs(30),
+      canal_preferido: "whatsapp",
     });
 
     await ctx.db.insert("recordatorios", {

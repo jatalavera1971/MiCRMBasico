@@ -25,3 +25,8 @@ export const PRIORITY_STYLES: Record<
 };
 
 export const PRIORIDADES: Prioridad[] = ["alta", "media", "baja"];
+
+// JOS-45: chips de filtro de P2 — "todas" no es un valor real de prioridad, es
+// el sentinela del chip que no filtra.
+export type PrioridadFiltro = "todas" | Prioridad;
+export const PRIORIDAD_FILTROS: PrioridadFiltro[] = ["todas", ...PRIORIDADES];

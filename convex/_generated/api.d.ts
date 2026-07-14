@@ -14,6 +14,7 @@ import type * as model_clientes from "../model/clientes.js";
 import type * as model_recordatorios from "../model/recordatorios.js";
 import type * as recordatorios from "../recordatorios.js";
 import type * as seed from "../seed.js";
+import type * as seedPerf from "../seedPerf.js";
 
 import type {
   ApiFromModules,
@@ -28,6 +29,7 @@ declare const fullApi: ApiFromModules<{
   "model/recordatorios": typeof model_recordatorios;
   recordatorios: typeof recordatorios;
   seed: typeof seed;
+  seedPerf: typeof seedPerf;
 }>;
 
 /**

@@ -46,5 +46,10 @@ export default defineSchema({
     // Fecha sin hora (YYYY-MM-DD): JOS-23 solo pide granularidad de día ("Hoy"/"Vencido hace X días").
     fecha: v.string(),
     estado: v.union(v.literal("pendiente"), v.literal("hecho")),
-  }).index("by_estado_fecha", ["estado", "fecha"]),
+  })
+    .index("by_estado_fecha", ["estado", "fecha"])
+    // JOS-11: soporta el borrado en cascada de eliminarCliente sin collect()
+    // sobre toda la tabla. Reutilizable más adelante por JOS-19/JOS-22
+    // (historial/recordatorios "de este cliente") cuando existan.
+    .index("by_cliente_id", ["cliente_id"]),
 });

@@ -1,19 +1,33 @@
+import { notFound } from "next/navigation";
+import { fetchQuery } from "convex/nextjs";
+import { ConvexError } from "convex/values";
+import { api } from "../../../../../convex/_generated/api";
+import type { ClienteListado } from "@/components/clientes/ClienteRow";
+import { ClienteFichaClient } from "@/components/clientes/ClienteFichaClient";
+
+export const dynamic = "force-dynamic";
+
 export default async function FichaClientePage({
   params,
 }: {
   params: Promise<{ clienteId: string }>;
 }) {
   const { clienteId } = await params;
-  return (
-    <div className="p-6">
-      <h1 className="text-xl font-semibold text-text-primary">
-        Ficha de cliente
-      </h1>
-      <p className="mt-2 text-sm text-text-tertiary">
-        P3 (Ficha de cliente) — fuera de alcance de esta pantalla, solo
-        destino de navegación desde la lista de tareas del día. Cliente:{" "}
-        {clienteId}
-      </p>
-    </div>
-  );
+
+  let cliente: ClienteListado;
+  try {
+    cliente = await fetchQuery(api.clientes.obtenerCliente, { clienteId });
+  } catch (err) {
+    // Solo el caso de negocio esperado ("Cliente no encontrado" — id con
+    // formato inválido o cliente inexistente, ver convex/model/clientes.ts:
+    // obtenerCliente) se convierte en 404. Cualquier otro fallo (caída de
+    // Convex, error interno) se relanza y llega al error boundary genérico
+    // de Next.js — nunca se disfraza de "no encontrado".
+    if (err instanceof ConvexError && err.data === "Cliente no encontrado") {
+      notFound();
+    }
+    throw err;
+  }
+
+  return <ClienteFichaClient cliente={cliente} />;
 }

@@ -1,9 +1,14 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import {
+  actualizarCanalPreferido as actualizarCanalPreferidoModel,
+  actualizarCliente as actualizarClienteModel,
+  actualizarPrioridad as actualizarPrioridadModel,
   crearCliente as crearClienteModel,
+  eliminarCliente as eliminarClienteModel,
   listarClientes as listarClientesModel,
   listarClientesInactivos as listarClientesInactivosModel,
+  obtenerCliente as obtenerClienteModel,
 } from "./model/clientes";
 
 // Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
@@ -49,5 +54,86 @@ export const listarClientes = query({
   args: {},
   handler: async (ctx) => {
     return listarClientesModel(ctx);
+  },
+});
+
+// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
+// construido todavía. Desplegada igualmente en Railway con este riesgo aceptado
+// explícitamente desde 2026-07-12 — ver README.md. `clienteId` es v.string()
+// a propósito, no v.id("clientes") (ver convex/model/clientes.ts:obtenerCliente)
+// para que un id con formato inválido no falle en la validación de argumentos
+// del SDK antes de llegar al handler.
+export const obtenerCliente = query({
+  args: { clienteId: v.string() },
+  handler: async (ctx, { clienteId }) => {
+    return obtenerClienteModel(ctx, { clienteId });
+  },
+});
+
+// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
+// construido todavía. Desplegada igualmente en Railway con este riesgo aceptado
+// explícitamente desde 2026-07-12 — ver README.md. JOS-11/P4 (edición, 15 jul
+// 2026): primera mutation pública capaz de MODIFICAR datos ya existentes de
+// cualquier cliente (hasta ahora solo se podía crear/leer/marcar recordatorios
+// hechos) — riesgo ampliado aceptado explícitamente el 15 jul 2026.
+export const actualizarCliente = mutation({
+  args: {
+    clienteId: v.id("clientes"),
+    nombre: v.string(),
+    email: v.string(),
+    empresa: v.optional(v.string()),
+    telefono: v.optional(v.string()),
+    prioridad: v.union(v.literal("alta"), v.literal("media"), v.literal("baja")),
+  },
+  handler: async (ctx, args) => {
+    return actualizarClienteModel(ctx, args);
+  },
+});
+
+// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
+// construido todavía. Desplegada igualmente en Railway con este riesgo aceptado
+// explícitamente desde 2026-07-12 — ver README.md. Edición rápida de grano fino
+// (JOS-11, selector de 4 botones de la ficha) — mismo riesgo ampliado de
+// actualizarCliente, aceptado explícitamente el 15 jul 2026.
+export const actualizarCanalPreferido = mutation({
+  args: {
+    clienteId: v.id("clientes"),
+    canal_preferido: v.union(
+      v.literal("telefono"),
+      v.literal("whatsapp"),
+      v.literal("email"),
+      v.literal("reunion"),
+    ),
+  },
+  handler: async (ctx, args) => {
+    return actualizarCanalPreferidoModel(ctx, args);
+  },
+});
+
+// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
+// construido todavía. Desplegada igualmente en Railway con este riesgo aceptado
+// explícitamente desde 2026-07-12 — ver README.md. Edición rápida de grano fino
+// (JOS-44, bottom sheet de prioridad de la ficha) — mismo riesgo ampliado de
+// actualizarCliente, aceptado explícitamente el 15 jul 2026.
+export const actualizarPrioridad = mutation({
+  args: {
+    clienteId: v.id("clientes"),
+    prioridad: v.union(v.literal("alta"), v.literal("media"), v.literal("baja")),
+  },
+  handler: async (ctx, args) => {
+    return actualizarPrioridadModel(ctx, args);
+  },
+});
+
+// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
+// construido todavía. Desplegada igualmente en Railway con este riesgo aceptado
+// explícitamente desde 2026-07-12 — ver README.md. JOS-11 (15 jul 2026): primera
+// mutation pública capaz de BORRAR datos reales de forma permanente y en
+// cascada (el cliente y sus recordatorios) — riesgo ampliado aceptado
+// explícitamente el 15 jul 2026, mayor que crear/leer/actualizar.
+export const eliminarCliente = mutation({
+  args: { clienteId: v.id("clientes") },
+  handler: async (ctx, { clienteId }) => {
+    return eliminarClienteModel(ctx, { clienteId });
   },
 });

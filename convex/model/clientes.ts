@@ -1,4 +1,5 @@
 import { ConvexError } from "convex/values";
+import type { Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -54,21 +55,17 @@ export async function contarClientesCerrados(ctx: QueryCtx) {
   return cerrados.length;
 }
 
-// JOS-12 (alta de cliente): crea un cliente nuevo en fase "lead". Valida en el
-// servidor aunque el formulario ya valide en cliente (defensa en profundidad,
-// mismo criterio que marcarComoHecho) — nunca hay que confiar solo en la
-// validación del cliente. Límites de longitud (ronda 1 de auditoría): mitigación
-// mínima aceptada junto con el riesgo de escritura pública sin rate-limit/auth.
-export async function crearCliente(
-  ctx: MutationCtx,
-  args: {
-    nombre: string;
-    email: string;
-    empresa?: string;
-    telefono?: string;
-    prioridad: "alta" | "media" | "baja";
-  },
-) {
+// Validación compartida por crearCliente y actualizarCliente (JOS-11):
+// recorta/normaliza y valida nombre/email/empresa/telefono, devolviendo el
+// payload ya normalizado para que ninguna de las dos mutations repita la
+// normalización. Nunca confiar solo en la validación del formulario en
+// cliente — defensa en profundidad, mismo criterio que marcarComoHecho.
+function validarDatosContacto(args: {
+  nombre: string;
+  email: string;
+  empresa?: string;
+  telefono?: string;
+}) {
   const nombre = args.nombre.trim();
   const email = args.email.trim().toLowerCase();
   const empresa = args.empresa?.trim();
@@ -96,11 +93,31 @@ export async function crearCliente(
     throw new ConvexError("El teléfono no puede superar los 40 caracteres");
   }
 
-  return ctx.db.insert("clientes", {
+  return {
     nombre,
     email,
     empresa: empresa || undefined,
     telefono: telefono || undefined,
+  };
+}
+
+// JOS-12 (alta de cliente): crea un cliente nuevo en fase "lead". Límites de
+// longitud (ronda 1 de auditoría): mitigación mínima aceptada junto con el
+// riesgo de escritura pública sin rate-limit/auth.
+export async function crearCliente(
+  ctx: MutationCtx,
+  args: {
+    nombre: string;
+    email: string;
+    empresa?: string;
+    telefono?: string;
+    prioridad: "alta" | "media" | "baja";
+  },
+) {
+  const datos = validarDatosContacto(args);
+
+  return ctx.db.insert("clientes", {
+    ...datos,
     prioridad: args.prioridad,
     fase: "lead",
     fecha_alta: Date.now(),
@@ -110,6 +127,109 @@ export async function crearCliente(
     // verdad — mismo criterio que el prototipo, que hardcodea "Email" al crear.
     canal_preferido: "email",
   });
+}
+
+// JOS-11: obtiene un cliente por id, para la ficha (P3). `clienteId` llega
+// como string en bruto desde la URL — normalizeId valida el formato y evita
+// que un id mal formado falle en la validación de argumentos del propio SDK
+// (eso propagaría un error distinto a page.tsx, obligando a distinguir
+// errores del SDK ahí, frágil). Formato inválido y "no existe" convergen en
+// el mismo ConvexError, para que page.tsx solo tenga que discriminar un caso.
+export async function obtenerCliente(
+  ctx: QueryCtx,
+  args: { clienteId: string },
+) {
+  const id = ctx.db.normalizeId("clientes", args.clienteId);
+  const cliente = id ? await ctx.db.get(id) : null;
+  if (!cliente) {
+    throw new ConvexError("Cliente no encontrado");
+  }
+  return {
+    _id: cliente._id,
+    nombre: cliente.nombre,
+    email: cliente.email,
+    telefono: cliente.telefono,
+    empresa: cliente.empresa,
+    canal_preferido: cliente.canal_preferido,
+    fase: cliente.fase,
+    prioridad: cliente.prioridad,
+    fecha_ultimo_contacto: cliente.fecha_ultimo_contacto,
+  };
+}
+
+// JOS-11/P4 edición (diferida de JOS-12): guarda el formulario completo de
+// edición. A diferencia de actualizarCanalPreferido/actualizarPrioridad
+// (ediciones rápidas de grano fino desde la propia ficha), esta sí revalida
+// todo el bloque de datos de contacto, igual que crearCliente.
+export async function actualizarCliente(
+  ctx: MutationCtx,
+  args: {
+    clienteId: Id<"clientes">;
+    nombre: string;
+    email: string;
+    empresa?: string;
+    telefono?: string;
+    prioridad: "alta" | "media" | "baja";
+  },
+) {
+  const cliente = await ctx.db.get(args.clienteId);
+  if (!cliente) {
+    throw new ConvexError("Cliente no encontrado");
+  }
+  const datos = validarDatosContacto(args);
+  await ctx.db.patch(args.clienteId, { ...datos, prioridad: args.prioridad });
+}
+
+// JOS-11: edición rápida de canal preferido desde el selector de 4 botones de
+// la propia ficha — grano fino a propósito, no reusa actualizarCliente para
+// no obligar a revalidar/reenviar el resto del formulario en cada toque.
+export async function actualizarCanalPreferido(
+  ctx: MutationCtx,
+  args: {
+    clienteId: Id<"clientes">;
+    canal_preferido: "telefono" | "whatsapp" | "email" | "reunion";
+  },
+) {
+  const cliente = await ctx.db.get(args.clienteId);
+  if (!cliente) {
+    throw new ConvexError("Cliente no encontrado");
+  }
+  await ctx.db.patch(args.clienteId, {
+    canal_preferido: args.canal_preferido,
+  });
+}
+
+// JOS-44: edición rápida de prioridad desde el bottom sheet de confirmación
+// de la ficha — mismo criterio de grano fino que actualizarCanalPreferido.
+export async function actualizarPrioridad(
+  ctx: MutationCtx,
+  args: { clienteId: Id<"clientes">; prioridad: "alta" | "media" | "baja" },
+) {
+  const cliente = await ctx.db.get(args.clienteId);
+  if (!cliente) {
+    throw new ConvexError("Cliente no encontrado");
+  }
+  await ctx.db.patch(args.clienteId, { prioridad: args.prioridad });
+}
+
+// JOS-11: borrado permanente en cascada. Solo `recordatorios` — no existe
+// tabla `interacciones` en el schema todavía (F4/JOS-19, Fase 4). Riesgo de
+// seguridad ampliado (mutation pública sin auth capaz de borrar datos reales
+// de forma permanente) aceptado explícitamente el 15 jul 2026 — ver README.
+export async function eliminarCliente(
+  ctx: MutationCtx,
+  args: { clienteId: Id<"clientes"> },
+) {
+  const cliente = await ctx.db.get(args.clienteId);
+  if (!cliente) {
+    throw new ConvexError("Cliente no encontrado");
+  }
+  const recordatorios = await ctx.db
+    .query("recordatorios")
+    .withIndex("by_cliente_id", (q) => q.eq("cliente_id", args.clienteId))
+    .collect();
+  await Promise.all(recordatorios.map((r) => ctx.db.delete(r._id)));
+  await ctx.db.delete(args.clienteId);
 }
 
 // JOS-10/13/45: query real de la pantalla "Clientes" (P2) — el filtrado por

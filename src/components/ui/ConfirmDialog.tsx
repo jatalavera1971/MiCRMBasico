@@ -21,6 +21,12 @@ export function ConfirmDialog({
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
+  // JOS-11 (15 jul 2026): el <dialog> nativo emite "close" en CUALQUIER cierre,
+  // incluido el programático que dispara el useEffect de abajo cuando `open`
+  // pasa a false tras un onConfirm exitoso — sin este ref, onCancel se
+  // disparaba también en ese caso (espurio). Solo se marca justo antes de
+  // llamar a onConfirm; onClose lo consume una vez y no llama a onCancel.
+  const confirmedRef = useRef(false);
   const titleId = "confirm-dialog-title";
 
   useEffect(() => {
@@ -44,7 +50,13 @@ export function ConfirmDialog({
         e.preventDefault();
         onCancel();
       }}
-      onClose={onCancel}
+      onClose={() => {
+        if (confirmedRef.current) {
+          confirmedRef.current = false;
+          return;
+        }
+        onCancel();
+      }}
     >
       <div className="p-5">
         <h2 id={titleId} className="text-base font-semibold text-text-primary">
@@ -64,7 +76,10 @@ export function ConfirmDialog({
           <button
             ref={confirmRef}
             type="button"
-            onClick={onConfirm}
+            onClick={() => {
+              confirmedRef.current = true;
+              onConfirm();
+            }}
             className="rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white"
           >
             {confirmLabel}

@@ -16,7 +16,8 @@ export type ClienteListado = {
   fecha_ultimo_contacto?: number;
 };
 
-function getInitials(nombre: string): string {
+// Exportado para JOS-11: lo reutilizan ClienteFichaClient.tsx y ClientMenuSheet.tsx.
+export function getInitials(nombre: string): string {
   const palabras = nombre.trim().split(/\s+/).slice(0, 2);
   return palabras.map((p) => p[0]?.toUpperCase() ?? "").join("");
 }

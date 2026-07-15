@@ -15,6 +15,18 @@ export const FASE_LABELS: Record<Fase, string> = {
   cerrado: "Cerrado",
 };
 
+// JOS-11: orden real del pipeline, para pintar los chips de fase de la ficha
+// en modo solo-lectura (F6/JOS-15, cambio de fase, es de Fase 3 — no se
+// implementa todavía, solo se reserva el espacio visual con datos reales).
+export const FASES: Fase[] = [
+  "lead",
+  "cualificacion",
+  "primera_llamada",
+  "propuesta_enviada",
+  "negociacion",
+  "cerrado",
+];
+
 export const CANAL_LABELS: Record<CanalPreferido, string> = {
   telefono: "Teléfono",
   whatsapp: "WhatsApp",

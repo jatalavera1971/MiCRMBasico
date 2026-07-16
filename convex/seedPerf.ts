@@ -1,4 +1,4 @@
-// ⚠️ Borra TODOS los clientes y recordatorios existentes en el deployment antes de
+// ⚠️ Borra TODOS los clientes, recordatorios e interacciones existentes en el deployment antes de
 // sembrar 600 clientes sintéticos para el diagnóstico de rendimiento de JOS-31 (P2
 // lista+buscador, alcance parcial — ver plan). Dos guardas antes de tocar nada:
 // el argumento `confirm` debe coincidir exactamente, y el conteo actual de
@@ -82,6 +82,9 @@ export const seedPerfData = internalMutation({
       );
     }
 
+    for (const doc of await ctx.db.query("interacciones").collect()) {
+      await ctx.db.delete(doc._id);
+    }
     for (const doc of await ctx.db.query("recordatorios").collect()) {
       await ctx.db.delete(doc._id);
     }

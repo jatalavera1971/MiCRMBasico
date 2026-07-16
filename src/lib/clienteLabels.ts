@@ -33,3 +33,23 @@ export const CANAL_LABELS: Record<CanalPreferido, string> = {
   email: "Email",
   reunion: "Reunión",
 };
+
+// JOS-18: tipo de interacción — comparte las 4 opciones/iconos de
+// canal_preferido, pero es una unión propia y semánticamente distinta: una
+// es la preferencia declarada del cliente, la otra es lo que realmente
+// ocurrió en una interacción concreta.
+export type TipoInteraccion = Doc<"interacciones">["tipo"];
+
+export const TIPO_INTERACCION_LABELS: Record<TipoInteraccion, string> = {
+  llamada: "Llamada",
+  email: "Email",
+  whatsapp: "WhatsApp",
+  reunion: "Reunión",
+};
+
+export const TIPOS_INTERACCION: TipoInteraccion[] = [
+  "llamada",
+  "email",
+  "whatsapp",
+  "reunion",
+];

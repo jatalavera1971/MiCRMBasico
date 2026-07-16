@@ -212,8 +212,8 @@ export async function actualizarPrioridad(
   await ctx.db.patch(args.clienteId, { prioridad: args.prioridad });
 }
 
-// JOS-11: borrado permanente en cascada. Solo `recordatorios` — no existe
-// tabla `interacciones` en el schema todavía (F4/JOS-19, Fase 4). Riesgo de
+// JOS-11/JOS-18: borrado permanente en cascada sobre `recordatorios` e
+// `interacciones` (esta última añadida en JOS-18/19/20/21, F4). Riesgo de
 // seguridad ampliado (mutation pública sin auth capaz de borrar datos reales
 // de forma permanente) aceptado explícitamente el 15 jul 2026 — ver README.
 export async function eliminarCliente(
@@ -228,7 +228,14 @@ export async function eliminarCliente(
     .query("recordatorios")
     .withIndex("by_cliente_id", (q) => q.eq("cliente_id", args.clienteId))
     .collect();
-  await Promise.all(recordatorios.map((r) => ctx.db.delete(r._id)));
+  const interacciones = await ctx.db
+    .query("interacciones")
+    .withIndex("by_cliente_id", (q) => q.eq("cliente_id", args.clienteId))
+    .collect();
+  await Promise.all([
+    ...recordatorios.map((r) => ctx.db.delete(r._id)),
+    ...interacciones.map((i) => ctx.db.delete(i._id)),
+  ]);
   await ctx.db.delete(args.clienteId);
 }
 

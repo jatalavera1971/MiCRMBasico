@@ -1,6 +1,9 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { obtenerPendientesHoy } from "./model/recordatorios";
+import {
+  obtenerPendientesHoy,
+  obtenerProximoRecordatorio as obtenerProximoRecordatorioModel,
+} from "./model/recordatorios";
 
 // Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
 // construido todavía. Desplegada igualmente en Railway con este riesgo
@@ -9,6 +12,18 @@ export const listarSeguimientosHoy = query({
   args: {},
   handler: async (ctx) => {
     return obtenerPendientesHoy(ctx);
+  },
+});
+
+// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
+// construido todavía. Desplegada igualmente en Railway con este riesgo
+// aceptado explícitamente desde 2026-07-12 — ver README.md. JOS-21 (16 jul
+// 2026): la ficha (P3) muestra este dato en solo lectura, sin acciones de
+// gestión (eso sigue siendo JOS-22, sin construir).
+export const obtenerProximoRecordatorio = query({
+  args: { clienteId: v.id("clientes") },
+  handler: async (ctx, args) => {
+    return obtenerProximoRecordatorioModel(ctx, args);
   },
 });
 

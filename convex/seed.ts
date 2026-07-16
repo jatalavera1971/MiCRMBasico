@@ -1,8 +1,8 @@
-// ⚠️ Borra TODOS los clientes y recordatorios existentes en este deployment antes
-// de sembrar los de demo — no ejecutar contra un deployment con datos reales que
-// se quieran conservar. Idempotente a propósito: correrla 1 o 10 veces da el mismo
-// dataset determinista, para que KPIs/inactivos/recordatorios no se dupliquen entre
-// corridas de verificación.
+// ⚠️ Borra TODOS los clientes, recordatorios e interacciones existentes en este
+// deployment antes de sembrar los de demo — no ejecutar contra un deployment con
+// datos reales que se quieran conservar. Idempotente a propósito: correrla 1 o 10
+// veces da el mismo dataset determinista, para que KPIs/inactivos/recordatorios no
+// se dupliquen entre corridas de verificación.
 import { internalMutation } from "./_generated/server";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -18,6 +18,9 @@ function daysAgoISO(days: number): string {
 export const seedDemoData = internalMutation({
   args: {},
   handler: async (ctx) => {
+    for (const doc of await ctx.db.query("interacciones").collect()) {
+      await ctx.db.delete(doc._id);
+    }
     for (const doc of await ctx.db.query("recordatorios").collect()) {
       await ctx.db.delete(doc._id);
     }

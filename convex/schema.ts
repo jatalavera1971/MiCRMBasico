@@ -49,7 +49,32 @@ export default defineSchema({
   })
     .index("by_estado_fecha", ["estado", "fecha"])
     // JOS-11: soporta el borrado en cascada de eliminarCliente sin collect()
-    // sobre toda la tabla. Reutilizable más adelante por JOS-19/JOS-22
-    // (historial/recordatorios "de este cliente") cuando existan.
+    // sobre toda la tabla. También reutilizado por JOS-22 (recordatorio "de
+    // este cliente" en la ficha) cuando exista.
     .index("by_cliente_id", ["cliente_id"]),
+
+  // JOS-18/19/20/21 (F4): registro inmutable de una interacción con un
+  // cliente. `fecha` es epoch ms (no string YYYY-MM-DD como en recordatorios)
+  // para poder compararla numéricamente contra clientes.fecha_ultimo_contacto
+  // sin parsear — ver convex/model/interacciones.ts:crearInteraccion.
+  interacciones: defineTable({
+    cliente_id: v.id("clientes"),
+    tipo: v.union(
+      v.literal("llamada"),
+      v.literal("email"),
+      v.literal("whatsapp"),
+      v.literal("reunion"),
+    ),
+    notas: v.string(),
+    // Fecha REAL de la interacción (puede ser pasada), no la de creación del
+    // registro (_creationTime) — JOS-20 lo exige explícitamente.
+    fecha: v.number(),
+    // "Próximo paso" (JOS-21): ambos opcionales de forma independiente; solo
+    // si los dos están presentes se crea un recordatorio automático. Se
+    // normalizan a undefined si llegan como "" — ver validarDatosInteraccion.
+    proximo_paso_texto: v.optional(v.string()),
+    // YYYY-MM-DD, mismo formato que recordatorios.fecha (se copia tal cual
+    // al crear el recordatorio automático, sin conversión).
+    proximo_paso_fecha: v.optional(v.string()),
+  }).index("by_cliente_id", ["cliente_id"]),
 });

@@ -2,19 +2,20 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { Pencil, Share2, Trash2 } from "lucide-react";
+import { Pencil, Plus, Share2, Trash2 } from "lucide-react";
 import { getInitials } from "./ClienteRow";
 
-// JOS-11: menú "···" de la ficha. Alcance confirmado de esta pasada — SOLO
-// estas 3 opciones. "Registrar interacción" y "Añadir recordatorio" quedan
-// fuera a propósito: abrirían P5/JOS-18 y el CRUD de JOS-22, ninguno construido
-// todavía (Fase 4/5).
+// JOS-11/JOS-18: menú "···" de la ficha. "Registrar interacción" (JOS-18) se
+// añadió el 16 jul 2026 — hasta entonces quedaba fuera a propósito porque
+// P5/JOS-18 no existía. "Añadir recordatorio" sigue sin aparecer: eso es el
+// CRUD manual de JOS-22, todavía sin construir.
 export function ClientMenuSheet({
   open,
   nombre,
   empresa,
   editHref,
   onClose,
+  onRegisterInteraction,
   onShare,
   onDeleteRequest,
 }: {
@@ -23,6 +24,7 @@ export function ClientMenuSheet({
   empresa?: string;
   editHref: string;
   onClose: () => void;
+  onRegisterInteraction: () => void;
   onShare: () => void;
   onDeleteRequest: () => void;
 }) {
@@ -68,6 +70,19 @@ export function ClientMenuSheet({
             </span>
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={onRegisterInteraction}
+          className="flex w-full items-center gap-3.5 border-t border-border-subtle px-5 py-[15px] text-left"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-border-subtle">
+            <Plus className="h-[17px] w-[17px] text-text-secondary" strokeWidth={1.5} />
+          </span>
+          <span className="text-[15px] font-medium text-text-primary">
+            Registrar interacción
+          </span>
+        </button>
 
         <Link
           href={editHref}

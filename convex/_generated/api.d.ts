@@ -10,7 +10,9 @@
 
 import type * as clientes from "../clientes.js";
 import type * as dashboard from "../dashboard.js";
+import type * as interacciones from "../interacciones.js";
 import type * as model_clientes from "../model/clientes.js";
+import type * as model_interacciones from "../model/interacciones.js";
 import type * as model_recordatorios from "../model/recordatorios.js";
 import type * as recordatorios from "../recordatorios.js";
 import type * as seed from "../seed.js";
@@ -25,7 +27,9 @@ import type {
 declare const fullApi: ApiFromModules<{
   clientes: typeof clientes;
   dashboard: typeof dashboard;
+  interacciones: typeof interacciones;
   "model/clientes": typeof model_clientes;
+  "model/interacciones": typeof model_interacciones;
   "model/recordatorios": typeof model_recordatorios;
   recordatorios: typeof recordatorios;
   seed: typeof seed;

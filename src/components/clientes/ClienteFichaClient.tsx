@@ -15,20 +15,30 @@ import {
   MessageCircle,
   MoreVertical,
   Phone,
+  Plus,
+  type LucideIcon,
 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { getInitials, type ClienteListado } from "./ClienteRow";
-import { CANAL_LABELS, FASES, FASE_LABELS, type CanalPreferido } from "@/lib/clienteLabels";
+import {
+  CANAL_LABELS,
+  FASES,
+  FASE_LABELS,
+  TIPO_INTERACCION_LABELS,
+  type CanalPreferido,
+  type TipoInteraccion,
+} from "@/lib/clienteLabels";
+import { formatFechaCorta, formatFechaRecordatorio } from "@/lib/dates";
 import { PRIORITY_STYLES, type Prioridad } from "./priorityStyles";
 import { PrioritySheet } from "./PrioritySheet";
 import { ClientMenuSheet } from "./ClientMenuSheet";
+import { RegisterInteractionSheet } from "./RegisterInteractionSheet";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Toast } from "@/components/ui/Toast";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 // JOS-11 (Fase 2): solo canal preferido es editable desde aquí (F1). Pipeline
-// (F6/JOS-15), próximo recordatorio (F9/JOS-22) e historial (F4/JOS-19) son
-// de fases posteriores — se reserva el espacio visual, sin datos ni acciones.
+// (F6/JOS-15) sigue reservado, es de Fase 3.
 const CANAL_BOTONES = [
   { key: "telefono", label: "Llamar", icon: Phone },
   { key: "whatsapp", label: "WhatsApp", icon: MessageCircle },
@@ -36,25 +46,74 @@ const CANAL_BOTONES = [
   { key: "reunion", label: "Reunión", icon: Calendar },
 ] as const;
 
+// JOS-19: mismos 4 iconos que CANAL_BOTONES/InteractionTypeSelector, para
+// cada fila del historial.
+const TIPO_INTERACCION_ICONOS: Record<TipoInteraccion, LucideIcon> = {
+  llamada: Phone,
+  email: Mail,
+  whatsapp: MessageCircle,
+  reunion: Calendar,
+};
+
+export type Interaccion = {
+  _id: string;
+  tipo: TipoInteraccion;
+  notas: string;
+  fecha: number;
+  proximo_paso_texto?: string;
+  proximo_paso_fecha?: string;
+};
+
+export type ProximoRecordatorio = {
+  motivo: string;
+  fecha: string;
+  overdue: boolean;
+  diasVencido: number;
+} | null;
+
 export function ClienteFichaClient({
   cliente: clienteInicial,
+  interacciones,
+  proximoRecordatorio,
 }: {
   cliente: ClienteListado;
+  interacciones: Interaccion[];
+  proximoRecordatorio: ProximoRecordatorio;
 }) {
   const router = useRouter();
   const [cliente, setCliente] = useState(clienteInicial);
+  const [clienteSincronizado, setClienteSincronizado] = useState(clienteInicial);
   const [toast, setToast] = useState<string | null>(null);
   const [prioritySheetOpen, setPrioritySheetOpen] = useState(false);
   const [savingPrioridad, setSavingPrioridad] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [registerSheetOpen, setRegisterSheetOpen] = useState(false);
+  const [historialExpandido, setHistorialExpandido] = useState(false);
   const actualizarCanalPreferido = useMutation(api.clientes.actualizarCanalPreferido);
   const actualizarPrioridad = useMutation(api.clientes.actualizarPrioridad);
   const eliminarCliente = useMutation(api.clientes.eliminarCliente);
 
+  // Decisión 19 (plan JOS-18/19/20/21): useState(clienteInicial) solo toma el
+  // valor inicial una vez — sin esto, un router.refresh() que traiga un
+  // fecha_ultimo_contacto nuevo (tras registrar una interacción) no se
+  // reflejaría aquí. Se ajusta DURANTE el render (patrón "Adjusting state
+  // when a prop changes" de React), no en un useEffect, para no disparar un
+  // render en cascada. interacciones/proximoRecordatorio NO se copian a
+  // estado local a propósito: se renderizan directo desde las props, así que
+  // un router.refresh() ya las actualiza sin este problema.
+  if (clienteInicial !== clienteSincronizado) {
+    setClienteSincronizado(clienteInicial);
+    setCliente(clienteInicial);
+  }
+
   const prioridad = PRIORITY_STYLES[cliente.prioridad];
   const faseIdx = FASES.indexOf(cliente.fase);
+  const historialAMostrar =
+    interacciones.length > 10 && !historialExpandido
+      ? interacciones.slice(0, 5)
+      : interacciones;
 
   function handleVolver() {
     if (typeof window !== "undefined" && window.history.length > 1) {
@@ -121,6 +180,16 @@ export function ClienteFichaClient({
       setDeleting(false);
       setToast("No se pudo eliminar el cliente. Inténtalo de nuevo.");
     }
+  }
+
+  // JOS-18/20/21 (decisión 8/14 del plan): toast → cerrar sheet → refresh, en
+  // vez de parchear localmente interacciones/fecha_ultimo_contacto/próximo
+  // recordatorio — router.refresh() reejecuta el Server Component y trae los
+  // 3 datos ya consistentes desde el servidor.
+  function handleInteraccionSaved(mensaje: string) {
+    setRegisterSheetOpen(false);
+    setToast(mensaje);
+    router.refresh();
   }
 
   return (
@@ -280,27 +349,79 @@ export function ClienteFichaClient({
 
       <div className="h-2 bg-bg-app" />
 
-      {/* Próximo recordatorio — reservado (F9/JOS-22, Fase 5): sin fetch, sin acciones */}
+      {/* Próximo recordatorio — solo lectura (JOS-21). El CRUD manual (F9/JOS-22)
+          sigue sin construir; aquí solo se muestra el dato, sin botones de gestión. */}
       <div className="bg-surface px-4 py-4">
         <span className="mb-3 block text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">
           Próximo recordatorio
         </span>
-        <div className="rounded-[10px] border border-border-subtle bg-bg-app px-3.5 py-3 text-sm text-text-tertiary">
-          Disponible próximamente
-        </div>
+        {proximoRecordatorio ? (
+          <div
+            className={`rounded-[10px] px-3.5 py-3 ${
+              proximoRecordatorio.overdue ? "bg-risk-bg" : "border border-border-subtle bg-bg-app"
+            }`}
+          >
+            <p className="text-sm font-medium text-text-primary">
+              {proximoRecordatorio.motivo}
+            </p>
+            <p
+              className={`mt-1 text-xs ${
+                proximoRecordatorio.overdue ? "text-red-600" : "text-text-tertiary"
+              }`}
+            >
+              {formatFechaRecordatorio(
+                proximoRecordatorio.fecha,
+                proximoRecordatorio.overdue,
+                proximoRecordatorio.diasVencido,
+              )}
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-[10px] border border-border-subtle bg-bg-app px-3.5 py-3 text-sm text-text-tertiary">
+            Sin recordatorios pendientes
+          </div>
+        )}
       </div>
 
       <div className="h-2 bg-bg-app" />
 
-      {/* Historial — reservado (F4/JOS-19, Fase 4): sin fetch, sin acciones */}
-      <div className="bg-surface px-4 pb-2 pt-4">
-        <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">
-          Historial
-        </span>
-        <EmptyState
-          icon={<Clock className="h-6 w-6 text-primary-600" strokeWidth={1.5} />}
-          title="El historial de interacciones estará disponible próximamente"
-        />
+      {/* Historial (JOS-19) */}
+      <div className="bg-surface px-4 pb-3 pt-4">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">
+            Historial
+          </span>
+          <button
+            type="button"
+            onClick={() => setRegisterSheetOpen(true)}
+            className="flex items-center gap-1 rounded-md border border-primary-600 px-2.5 py-1 text-xs font-medium text-primary-600"
+          >
+            <Plus className="h-3.5 w-3.5" strokeWidth={2} />
+            Registrar
+          </button>
+        </div>
+        {interacciones.length === 0 ? (
+          <EmptyState
+            icon={<Clock className="h-6 w-6 text-primary-600" strokeWidth={1.5} />}
+            title="Aún no hay interacciones registradas."
+            description="Toca el botón para anotar la primera conversación."
+          />
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            {historialAMostrar.map((interaccion) => (
+              <InteraccionRow key={interaccion._id} interaccion={interaccion} />
+            ))}
+            {interacciones.length > 10 && !historialExpandido ? (
+              <button
+                type="button"
+                onClick={() => setHistorialExpandido(true)}
+                className="self-center py-1 text-sm font-medium text-primary-600"
+              >
+                Ver todas ({interacciones.length})
+              </button>
+            ) : null}
+          </div>
+        )}
       </div>
 
       <PrioritySheet
@@ -317,6 +438,10 @@ export function ClienteFichaClient({
         empresa={cliente.empresa}
         editHref={`/clientes/${encodeURIComponent(cliente._id)}/editar`}
         onClose={() => setMenuOpen(false)}
+        onRegisterInteraction={() => {
+          setMenuOpen(false);
+          setRegisterSheetOpen(true);
+        }}
         onShare={handleCompartir}
         onDeleteRequest={() => {
           setMenuOpen(false);
@@ -324,16 +449,55 @@ export function ClienteFichaClient({
         }}
       />
 
+      <RegisterInteractionSheet
+        open={registerSheetOpen}
+        clienteId={cliente._id}
+        onClose={() => setRegisterSheetOpen(false)}
+        onSaved={handleInteraccionSaved}
+      />
+
       <ConfirmDialog
         open={confirmDeleteOpen}
         title={`¿Eliminar a ${cliente.nombre}?`}
-        description="Esta acción no se puede deshacer. Se eliminará el cliente y sus recordatorios asociados."
+        description="Esta acción no se puede deshacer. Se eliminará el cliente y sus recordatorios e interacciones asociadas."
         confirmLabel="Sí, eliminar cliente"
         onConfirm={handleConfirmDelete}
         onCancel={() => setConfirmDeleteOpen(false)}
       />
 
       <Toast message={toast} onDismiss={() => setToast(null)} />
+    </div>
+  );
+}
+
+function InteraccionRow({ interaccion }: { interaccion: Interaccion }) {
+  const Icon = TIPO_INTERACCION_ICONOS[interaccion.tipo];
+  return (
+    <div className="flex gap-2.5 rounded-[10px] border border-border-subtle bg-bg-app px-3.5 py-3">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-600">
+        <Icon className="h-4 w-4" strokeWidth={1.5} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <span className="text-xs font-semibold text-text-primary">
+            {TIPO_INTERACCION_LABELS[interaccion.tipo]}
+          </span>
+          <span className="shrink-0 text-xs text-text-tertiary">
+            {formatFechaCorta(interaccion.fecha)}
+          </span>
+        </div>
+        <p className="text-sm leading-relaxed text-text-secondary">
+          {interaccion.notas}
+        </p>
+        {interaccion.proximo_paso_texto ? (
+          <p className="mt-1.5 text-xs text-primary-600">
+            Próximo paso: {interaccion.proximo_paso_texto}
+            {interaccion.proximo_paso_fecha
+              ? ` · ${formatFechaCorta(interaccion.proximo_paso_fecha)}`
+              : ""}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }

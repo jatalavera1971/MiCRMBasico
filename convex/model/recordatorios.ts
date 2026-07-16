@@ -1,6 +1,16 @@
+import type { Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+// JOS-21 (16 jul 2026): crearInteraccion puede crear recordatorios públicos y
+// sin autenticación vía "próximo paso" — antes de esto, esta tabla solo
+// crecía por seeds internos, nunca por una mutation pública, así que un
+// .collect() sin tope aquí no era explotable. Mismo tipo de mitigación ya
+// aceptado en listarClientes (convex/model/clientes.ts): no es paginación
+// real, acota el coste de la consulta ante un posible ataque de volumen; si
+// el total de pendientes supera este tope, deja de cubrir el resto sin que
+// se note.
+const RECORDATORIOS_CAP = 500;
 
 // Convex corre en UTC — "hoy" se calcula en UTC, no en hora de Madrid. Puede
 // haber un desfase de un día alrededor de medianoche. Limitación conocida del
@@ -35,7 +45,7 @@ export async function obtenerPendientesHoy(ctx: QueryCtx) {
     .withIndex("by_estado_fecha", (q) =>
       q.eq("estado", "pendiente").lte("fecha", hoy),
     )
-    .collect();
+    .take(RECORDATORIOS_CAP);
 
   const conCliente = await Promise.all(
     pendientes.map(async (r) => {
@@ -55,4 +65,35 @@ export async function obtenerPendientesHoy(ctx: QueryCtx) {
   );
 
   return conCliente.sort(compareSeguimientos);
+}
+
+// JOS-21/ficha (F9, solo lectura — el CRUD manual completo sigue siendo
+// JOS-22, sin construir): recordatorio pendiente más próximo de un cliente
+// concreto, o null si no tiene ninguno. Reutiliza el índice by_cliente_id ya
+// existente (JOS-11), sin necesidad de uno nuevo.
+export async function obtenerProximoRecordatorio(
+  ctx: QueryCtx,
+  args: { clienteId: Id<"clientes"> },
+) {
+  const hoy = hoyISO();
+  const recordatorios = await ctx.db
+    .query("recordatorios")
+    .withIndex("by_cliente_id", (q) => q.eq("cliente_id", args.clienteId))
+    .take(RECORDATORIOS_CAP);
+
+  const pendientes = recordatorios.filter((r) => r.estado === "pendiente");
+  if (pendientes.length === 0) {
+    return null;
+  }
+
+  const proximo = pendientes.reduce((min, r) =>
+    r.fecha < min.fecha ? r : min,
+  );
+  const overdue = proximo.fecha < hoy;
+  return {
+    motivo: proximo.motivo,
+    fecha: proximo.fecha,
+    overdue,
+    diasVencido: overdue ? diasEntre(proximo.fecha, hoy) : 0,
+  };
 }

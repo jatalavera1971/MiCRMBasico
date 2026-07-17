@@ -30,19 +30,19 @@ export default async function FichaClientePage({
   }
 
   // Decisión 13 (plan JOS-18/19/20/21): solo se lanzan en paralelo una vez el
-  // cliente existe de verdad — listarInteracciones/obtenerProximoRecordatorio
+  // cliente existe de verdad — listarInteracciones/listarRecordatoriosPendientes
   // toman v.id("clientes") validado (cliente._id), no el clienteId crudo de
   // la URL.
-  const [interacciones, proximoRecordatorio] = await Promise.all([
+  const [interacciones, recordatoriosPendientes] = await Promise.all([
     fetchQuery(api.interacciones.listarInteracciones, { clienteId: cliente._id }),
-    fetchQuery(api.recordatorios.obtenerProximoRecordatorio, { clienteId: cliente._id }),
+    fetchQuery(api.recordatorios.listarRecordatoriosPendientes, { clienteId: cliente._id }),
   ]);
 
   return (
     <ClienteFichaClient
       cliente={cliente}
       interacciones={interacciones}
-      proximoRecordatorio={proximoRecordatorio}
+      recordatoriosPendientes={recordatoriosPendientes}
     />
   );
 }

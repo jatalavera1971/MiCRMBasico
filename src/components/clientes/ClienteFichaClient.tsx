@@ -19,6 +19,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import { getInitials, type ClienteListado } from "./ClienteRow";
 import {
   CANAL_LABELS,
@@ -33,6 +34,7 @@ import { PRIORITY_STYLES, type Prioridad } from "./priorityStyles";
 import { PrioritySheet } from "./PrioritySheet";
 import { ClientMenuSheet } from "./ClientMenuSheet";
 import { RegisterInteractionSheet } from "./RegisterInteractionSheet";
+import { RecordatorioSheet, type RecordatorioEditable } from "./RecordatorioSheet";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Toast } from "@/components/ui/Toast";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -64,21 +66,22 @@ export type Interaccion = {
   proximo_paso_fecha?: string;
 };
 
-export type ProximoRecordatorio = {
+export type RecordatorioPendiente = {
+  _id: Id<"recordatorios">;
   motivo: string;
   fecha: string;
   overdue: boolean;
   diasVencido: number;
-} | null;
+};
 
 export function ClienteFichaClient({
   cliente: clienteInicial,
   interacciones,
-  proximoRecordatorio,
+  recordatoriosPendientes,
 }: {
   cliente: ClienteListado;
   interacciones: Interaccion[];
-  proximoRecordatorio: ProximoRecordatorio;
+  recordatoriosPendientes: RecordatorioPendiente[];
 }) {
   const router = useRouter();
   const [cliente, setCliente] = useState(clienteInicial);
@@ -91,16 +94,23 @@ export function ClienteFichaClient({
   const [deleting, setDeleting] = useState(false);
   const [registerSheetOpen, setRegisterSheetOpen] = useState(false);
   const [historialExpandido, setHistorialExpandido] = useState(false);
+  const [recordatorioSheetOpen, setRecordatorioSheetOpen] = useState(false);
+  const [recordatorioEditando, setRecordatorioEditando] =
+    useState<RecordatorioEditable | null>(null);
+  const [recordatoriosExpandido, setRecordatoriosExpandido] = useState(false);
+  const [confirmHechoTarget, setConfirmHechoTarget] =
+    useState<RecordatorioPendiente | null>(null);
   const actualizarCanalPreferido = useMutation(api.clientes.actualizarCanalPreferido);
   const actualizarPrioridad = useMutation(api.clientes.actualizarPrioridad);
   const eliminarCliente = useMutation(api.clientes.eliminarCliente);
+  const marcarComoHecho = useMutation(api.recordatorios.marcarComoHecho);
 
   // Decisión 19 (plan JOS-18/19/20/21): useState(clienteInicial) solo toma el
   // valor inicial una vez — sin esto, un router.refresh() que traiga un
   // fecha_ultimo_contacto nuevo (tras registrar una interacción) no se
   // reflejaría aquí. Se ajusta DURANTE el render (patrón "Adjusting state
   // when a prop changes" de React), no en un useEffect, para no disparar un
-  // render en cascada. interacciones/proximoRecordatorio NO se copian a
+  // render en cascada. interacciones/recordatoriosPendientes NO se copian a
   // estado local a propósito: se renderizan directo desde las props, así que
   // un router.refresh() ya las actualiza sin este problema.
   if (clienteInicial !== clienteSincronizado) {
@@ -114,6 +124,10 @@ export function ClienteFichaClient({
     interacciones.length > 10 && !historialExpandido
       ? interacciones.slice(0, 5)
       : interacciones;
+  // JOS-22: recordatoriosPendientes ya viene ordenado asc por fecha desde el
+  // backend (índice by_cliente_estado_fecha) — "el más próximo" es
+  // simplemente el primero; el resto solo se muestra si se expande.
+  const [proximoRecordatorio, ...otrosRecordatorios] = recordatoriosPendientes;
 
   function handleVolver() {
     if (typeof window !== "undefined" && window.history.length > 1) {
@@ -190,6 +204,36 @@ export function ClienteFichaClient({
     setRegisterSheetOpen(false);
     setToast(mensaje);
     router.refresh();
+  }
+
+  // JOS-22: mismo patrón toast → cerrar sheet → refresh que la interacción.
+  function handleRecordatorioSaved(mensaje: string) {
+    setRecordatorioSheetOpen(false);
+    setToast(mensaje);
+    router.refresh();
+  }
+
+  function handleAbrirCrearRecordatorio() {
+    setRecordatorioEditando(null);
+    setRecordatorioSheetOpen(true);
+  }
+
+  function handleAbrirEditarRecordatorio(r: RecordatorioPendiente) {
+    setRecordatorioEditando({ _id: r._id, fecha: r.fecha, motivo: r.motivo });
+    setRecordatorioSheetOpen(true);
+  }
+
+  async function handleConfirmHecho() {
+    if (!confirmHechoTarget) return;
+    const target = confirmHechoTarget;
+    setConfirmHechoTarget(null);
+    try {
+      await marcarComoHecho({ recordatorioId: target._id });
+      setToast("Recordatorio completado");
+      router.refresh();
+    } catch {
+      setToast("No se pudo marcar como hecho. Inténtalo de nuevo.");
+    }
   }
 
   return (
@@ -349,36 +393,57 @@ export function ClienteFichaClient({
 
       <div className="h-2 bg-bg-app" />
 
-      {/* Próximo recordatorio — solo lectura (JOS-21). El CRUD manual (F9/JOS-22)
-          sigue sin construir; aquí solo se muestra el dato, sin botones de gestión. */}
+      {/* Próximo recordatorio (JOS-22) */}
       <div className="bg-surface px-4 py-4">
-        <span className="mb-3 block text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">
-          Próximo recordatorio
-        </span>
-        {proximoRecordatorio ? (
-          <div
-            className={`rounded-[10px] px-3.5 py-3 ${
-              proximoRecordatorio.overdue ? "bg-risk-bg" : "border border-border-subtle bg-bg-app"
-            }`}
-          >
-            <p className="text-sm font-medium text-text-primary">
-              {proximoRecordatorio.motivo}
-            </p>
-            <p
-              className={`mt-1 text-xs ${
-                proximoRecordatorio.overdue ? "text-red-600" : "text-text-tertiary"
-              }`}
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">
+            Próximo recordatorio
+          </span>
+          {!proximoRecordatorio ? (
+            <button
+              type="button"
+              onClick={handleAbrirCrearRecordatorio}
+              className="flex items-center gap-1 rounded-md border border-primary-600 px-2.5 py-1 text-xs font-medium text-primary-600"
             >
-              {formatFechaRecordatorio(
-                proximoRecordatorio.fecha,
-                proximoRecordatorio.overdue,
-                proximoRecordatorio.diasVencido,
-              )}
-            </p>
-          </div>
-        ) : (
+              <Plus className="h-3.5 w-3.5" strokeWidth={2} />
+              Añadir
+            </button>
+          ) : null}
+        </div>
+        {!proximoRecordatorio ? (
           <div className="rounded-[10px] border border-border-subtle bg-bg-app px-3.5 py-3 text-sm text-text-tertiary">
             Sin recordatorios pendientes
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            <RecordatorioRow
+              recordatorio={proximoRecordatorio}
+              onMarkDone={() => setConfirmHechoTarget(proximoRecordatorio)}
+              onEdit={() => handleAbrirEditarRecordatorio(proximoRecordatorio)}
+            />
+            {otrosRecordatorios.length > 0 ? (
+              <>
+                {recordatoriosExpandido
+                  ? otrosRecordatorios.map((r) => (
+                      <RecordatorioRow
+                        key={r._id}
+                        recordatorio={r}
+                        onMarkDone={() => setConfirmHechoTarget(r)}
+                        onEdit={() => handleAbrirEditarRecordatorio(r)}
+                      />
+                    ))
+                  : null}
+                <button
+                  type="button"
+                  onClick={() => setRecordatoriosExpandido((v) => !v)}
+                  className="self-center py-1 text-sm font-medium text-primary-600"
+                >
+                  {recordatoriosExpandido
+                    ? "Ver menos"
+                    : `Ver todos (${recordatoriosPendientes.length})`}
+                </button>
+              </>
+            ) : null}
           </div>
         )}
       </div>
@@ -442,6 +507,10 @@ export function ClienteFichaClient({
           setMenuOpen(false);
           setRegisterSheetOpen(true);
         }}
+        onAddRecordatorio={() => {
+          setMenuOpen(false);
+          handleAbrirCrearRecordatorio();
+        }}
         onShare={handleCompartir}
         onDeleteRequest={() => {
           setMenuOpen(false);
@@ -456,6 +525,14 @@ export function ClienteFichaClient({
         onSaved={handleInteraccionSaved}
       />
 
+      <RecordatorioSheet
+        open={recordatorioSheetOpen}
+        clienteId={cliente._id}
+        recordatorio={recordatorioEditando}
+        onClose={() => setRecordatorioSheetOpen(false)}
+        onSaved={handleRecordatorioSaved}
+      />
+
       <ConfirmDialog
         open={confirmDeleteOpen}
         title={`¿Eliminar a ${cliente.nombre}?`}
@@ -465,7 +542,65 @@ export function ClienteFichaClient({
         onCancel={() => setConfirmDeleteOpen(false)}
       />
 
+      <ConfirmDialog
+        open={confirmHechoTarget !== null}
+        title="¿Marcar como hecho?"
+        description={confirmHechoTarget?.motivo}
+        confirmLabel="Marcar como hecho"
+        onConfirm={handleConfirmHecho}
+        onCancel={() => setConfirmHechoTarget(null)}
+      />
+
       <Toast message={toast} onDismiss={() => setToast(null)} />
+    </div>
+  );
+}
+
+function RecordatorioRow({
+  recordatorio,
+  onMarkDone,
+  onEdit,
+}: {
+  recordatorio: RecordatorioPendiente;
+  onMarkDone: () => void;
+  onEdit: () => void;
+}) {
+  return (
+    <div
+      className={`rounded-[10px] px-3.5 py-3 ${
+        recordatorio.overdue ? "bg-risk-bg" : "border border-border-subtle bg-bg-app"
+      }`}
+    >
+      <p className="text-sm font-medium text-text-primary">
+        {recordatorio.motivo}
+      </p>
+      <p
+        className={`mt-1 text-xs ${
+          recordatorio.overdue ? "text-red-600" : "text-text-tertiary"
+        }`}
+      >
+        {formatFechaRecordatorio(
+          recordatorio.fecha,
+          recordatorio.overdue,
+          recordatorio.diasVencido,
+        )}
+      </p>
+      <div className="mt-2.5 flex gap-4">
+        <button
+          type="button"
+          onClick={onMarkDone}
+          className="text-xs font-medium text-primary-600"
+        >
+          Marcar como hecho
+        </button>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="text-xs font-medium text-text-secondary"
+        >
+          Editar
+        </button>
+      </div>
     </div>
   );
 }

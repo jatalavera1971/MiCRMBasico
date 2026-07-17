@@ -1,8 +1,10 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import {
+  actualizarRecordatorio as actualizarRecordatorioModel,
+  crearRecordatorio as crearRecordatorioModel,
+  listarRecordatoriosPendientes as listarRecordatoriosPendientesModel,
   obtenerPendientesHoy,
-  obtenerProximoRecordatorio as obtenerProximoRecordatorioModel,
 } from "./model/recordatorios";
 
 // Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
@@ -17,13 +19,49 @@ export const listarSeguimientosHoy = query({
 
 // Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
 // construido todavía. Desplegada igualmente en Railway con este riesgo
-// aceptado explícitamente desde 2026-07-12 — ver README.md. JOS-21 (16 jul
-// 2026): la ficha (P3) muestra este dato en solo lectura, sin acciones de
-// gestión (eso sigue siendo JOS-22, sin construir).
-export const obtenerProximoRecordatorio = query({
+// aceptado explícitamente desde 2026-07-12 — ver README.md. JOS-22 (17 jul
+// 2026): lista completa de recordatorios pendientes de un cliente, para la
+// sección "Próximo recordatorio" (el primero) y su "Ver todos" (el resto) —
+// sustituye a la anterior obtenerProximoRecordatorio (JOS-21), que solo
+// devolvía uno.
+export const listarRecordatoriosPendientes = query({
   args: { clienteId: v.id("clientes") },
   handler: async (ctx, args) => {
-    return obtenerProximoRecordatorioModel(ctx, args);
+    return listarRecordatoriosPendientesModel(ctx, args);
+  },
+});
+
+// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
+// construido todavía. Desplegada igualmente en Railway con este riesgo
+// aceptado explícitamente desde 2026-07-12 — ver README.md. JOS-22 (17 jul
+// 2026): primera mutation pública que CREA un recordatorio directamente
+// desde la ficha, sin pasar por una interacción (hasta ahora solo existía el
+// efecto automático de crearInteraccion) — riesgo ampliado aceptado
+// explícitamente el 17 jul 2026, con límites de longitud/fecha server-side
+// (ver convex/model/recordatorios.ts:validarDatosRecordatorio).
+export const crearRecordatorio = mutation({
+  args: { clienteId: v.id("clientes"), fecha: v.string(), motivo: v.string() },
+  handler: async (ctx, args) => {
+    return crearRecordatorioModel(ctx, args);
+  },
+});
+
+// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
+// construido todavía. Desplegada igualmente en Railway con este riesgo
+// aceptado explícitamente desde 2026-07-12 — ver README.md. JOS-22 (17 jul
+// 2026): edita fecha/motivo de un recordatorio pendiente ya existente. Exige
+// `clienteId` además de `recordatorioId` para verificar pertenencia en
+// servidor — mitigación de contrato, no un control de autorización real (sin
+// auth, cualquiera que conozca ambos ids podría seguir editando).
+export const actualizarRecordatorio = mutation({
+  args: {
+    recordatorioId: v.id("recordatorios"),
+    clienteId: v.id("clientes"),
+    fecha: v.string(),
+    motivo: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return actualizarRecordatorioModel(ctx, args);
   },
 });
 

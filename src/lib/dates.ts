@@ -9,9 +9,9 @@ export function formatDateLabel(overdue: boolean, diasVencido: number): string {
   return `Vencido hace ${diasVencido} día${diasVencido === 1 ? "" : "s"}`;
 }
 
-// JOS-21: próximo recordatorio de la ficha (obtenerProximoRecordatorio), a
-// diferencia de formatDateLabel de arriba, NO está filtrado a fecha <= hoy —
-// puede ser un recordatorio futuro, así que "no vencido" no implica "hoy".
+// JOS-21/22: recordatorios de la ficha (listarRecordatoriosPendientes), a
+// diferencia de formatDateLabel de arriba, NO están filtrados a fecha <= hoy —
+// pueden ser recordatorios futuros, así que "no vencido" no implica "hoy".
 // Se distingue explícitamente: vencido → mismo copy que P1; hoy → "Hoy";
 // futuro → fecha corta legible.
 export function formatFechaRecordatorio(
@@ -71,4 +71,17 @@ export function hoyFechaISO(): string {
 export function fechaInputAEpoch(value: string): number {
   const [y, m, d] = value.split("-").map(Number);
   return new Date(y, m - 1, d).getTime();
+}
+
+// JOS-22: atajos de fecha del formulario de recordatorio ("Hoy"/"Mañana"/"En
+// 3 días"/"En 1 semana"). Usa exclusivamente getters/setters LOCALES de
+// `Date` (`getDate`/`setDate`/`getMonth`/`getFullYear`) — nunca
+// `new Date(stringISO)` ni `toISOString()` (ambos son UTC), para no
+// desfasar el día cerca de medianoche o en cambios de horario de verano.
+export function sumarDiasFechaISO(dias: number): string {
+  const fecha = new Date();
+  fecha.setDate(fecha.getDate() + dias);
+  const mm = String(fecha.getMonth() + 1).padStart(2, "0");
+  const dd = String(fecha.getDate()).padStart(2, "0");
+  return `${fecha.getFullYear()}-${mm}-${dd}`;
 }

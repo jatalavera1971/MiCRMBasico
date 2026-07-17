@@ -49,9 +49,15 @@ export default defineSchema({
   })
     .index("by_estado_fecha", ["estado", "fecha"])
     // JOS-11: soporta el borrado en cascada de eliminarCliente sin collect()
-    // sobre toda la tabla. También reutilizado por JOS-22 (recordatorio "de
-    // este cliente" en la ficha) cuando exista.
-    .index("by_cliente_id", ["cliente_id"]),
+    // sobre toda la tabla (necesita TODOS los recordatorios del cliente,
+    // independientemente del estado) — no puede sustituirse por el índice de
+    // abajo, que ya viene filtrado por estado.
+    .index("by_cliente_id", ["cliente_id"])
+    // JOS-22: recordatorios pendientes de un cliente ordenados por fecha real
+    // (no por _creationTime como daría by_cliente_id) — necesario para que
+    // listarRecordatoriosPendientes pueda acotar con `.take()` sin arriesgarse
+    // a perder los más próximos/vencidos de un cliente con muchas filas.
+    .index("by_cliente_estado_fecha", ["cliente_id", "estado", "fecha"]),
 
   // JOS-18/19/20/21 (F4): registro inmutable de una interacción con un
   // cliente. `fecha` es epoch ms (no string YYYY-MM-DD como en recordatorios)

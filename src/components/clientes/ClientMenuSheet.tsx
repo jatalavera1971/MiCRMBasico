@@ -2,13 +2,13 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { Pencil, Plus, Share2, Trash2 } from "lucide-react";
+import { CalendarPlus, Pencil, Plus, Share2, Trash2 } from "lucide-react";
 import { getInitials } from "./ClienteRow";
 
-// JOS-11/JOS-18: menú "···" de la ficha. "Registrar interacción" (JOS-18) se
-// añadió el 16 jul 2026 — hasta entonces quedaba fuera a propósito porque
-// P5/JOS-18 no existía. "Añadir recordatorio" sigue sin aparecer: eso es el
-// CRUD manual de JOS-22, todavía sin construir.
+// JOS-11/JOS-18/JOS-22: menú "···" de la ficha. "Registrar interacción"
+// (JOS-18, 16 jul 2026) y "Añadir recordatorio" (JOS-22, 17 jul 2026) se
+// añadieron cuando sus tareas respectivas se construyeron — hasta entonces
+// quedaban fuera a propósito porque ninguna existía todavía.
 export function ClientMenuSheet({
   open,
   nombre,
@@ -16,6 +16,7 @@ export function ClientMenuSheet({
   editHref,
   onClose,
   onRegisterInteraction,
+  onAddRecordatorio,
   onShare,
   onDeleteRequest,
 }: {
@@ -25,6 +26,7 @@ export function ClientMenuSheet({
   editHref: string;
   onClose: () => void;
   onRegisterInteraction: () => void;
+  onAddRecordatorio: () => void;
   onShare: () => void;
   onDeleteRequest: () => void;
 }) {
@@ -81,6 +83,19 @@ export function ClientMenuSheet({
           </span>
           <span className="text-[15px] font-medium text-text-primary">
             Registrar interacción
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={onAddRecordatorio}
+          className="flex w-full items-center gap-3.5 border-t border-border-subtle px-5 py-[15px] text-left"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-border-subtle">
+            <CalendarPlus className="h-[17px] w-[17px] text-text-secondary" strokeWidth={1.5} />
+          </span>
+          <span className="text-[15px] font-medium text-text-primary">
+            Añadir recordatorio
           </span>
         </button>
 

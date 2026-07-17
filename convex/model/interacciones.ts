@@ -1,6 +1,7 @@
 import { ConvexError } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
+import { esFechaISOValida } from "./validacionFechas";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 // Margen para "no futuro": absorbe el desfase entre el "hoy" del navegador
@@ -19,17 +20,7 @@ const FUTURE_TOLERANCE_MS = DAY_MS;
 const PAST_ALTA_TOLERANCE_MS = DAY_MS;
 const NOTAS_MAX = 2000;
 const PROXIMO_PASO_TEXTO_MAX = 200;
-const FECHA_ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
 const LISTAR_CAP = 500;
-
-function esFechaCalendarioReal(y: number, m: number, d: number): boolean {
-  const fecha = new Date(y, m - 1, d);
-  return (
-    fecha.getFullYear() === y &&
-    fecha.getMonth() === m - 1 &&
-    fecha.getDate() === d
-  );
-}
 
 // Valida y normaliza los datos de una interacción nueva. Nunca confiar solo
 // en las restricciones del formulario en cliente (maxLength / max del
@@ -80,16 +71,10 @@ function validarDatosInteraccion(args: {
 
   const proximoPasoFechaTrim = args.proximoPasoFecha?.trim();
   const proximoPasoFecha = proximoPasoFechaTrim || undefined;
-  if (proximoPasoFecha) {
-    if (!FECHA_ISO_RE.test(proximoPasoFecha)) {
-      throw new ConvexError(
-        "La fecha del próximo paso no tiene el formato YYYY-MM-DD",
-      );
-    }
-    const [y, m, d] = proximoPasoFecha.split("-").map(Number);
-    if (!esFechaCalendarioReal(y, m, d)) {
-      throw new ConvexError("La fecha del próximo paso no es una fecha real");
-    }
+  if (proximoPasoFecha && !esFechaISOValida(proximoPasoFecha)) {
+    throw new ConvexError(
+      "La fecha del próximo paso no tiene un formato o calendario válidos (YYYY-MM-DD)",
+    );
   }
 
   return { notas, proximoPasoTexto, proximoPasoFecha };

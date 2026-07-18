@@ -1,6 +1,8 @@
 import { ConvexError } from "convex/values";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
+
+type Fase = Doc<"clientes">["fase"];
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const INACTIVITY_WINDOW_MS = 7 * DAY_MS;
@@ -212,6 +214,21 @@ export async function actualizarPrioridad(
   await ctx.db.patch(args.clienteId, { prioridad: args.prioridad });
 }
 
+// JOS-14/15: edición rápida de fase de pipeline desde P3/P6 — mismo criterio
+// de grano fino que actualizarPrioridad. Sin restricción de transición: se
+// puede mover a cualquiera de las 6 fases, adelante o atrás (igual que el
+// selector de chips del prototipo, que permite tocar cualquier chip).
+export async function actualizarFase(
+  ctx: MutationCtx,
+  args: { clienteId: Id<"clientes">; fase: Fase },
+) {
+  const cliente = await ctx.db.get(args.clienteId);
+  if (!cliente) {
+    throw new ConvexError("Cliente no encontrado");
+  }
+  await ctx.db.patch(args.clienteId, { fase: args.fase });
+}
+
 // JOS-11/JOS-18: borrado permanente en cascada sobre `recordatorios` e
 // `interacciones` (esta última añadida en JOS-18/19/20/21, F4). Riesgo de
 // seguridad ampliado (mutation pública sin auth capaz de borrar datos reales
@@ -271,4 +288,48 @@ export async function listarClientes(ctx: QueryCtx) {
     prioridad: c.prioridad,
     fecha_ultimo_contacto: c.fecha_ultimo_contacto,
   }));
+}
+
+// JOS-14: orden de las 6 fases del pipeline, definido aquí de forma
+// independiente de src/lib/clienteLabels.ts (frontend) — ronda de auditoría
+// del plan JOS-14/15: el backend de Convex no debe acoplarse a código de UI.
+const ORDEN_FASES: Fase[] = [
+  "lead",
+  "cualificacion",
+  "primera_llamada",
+  "propuesta_enviada",
+  "negociacion",
+  "cerrado",
+];
+
+// JOS-14 (P6, vista Pipeline): agrupa clientes por fase para la vista kanban.
+// No delega en listarClientes: proyección propia y mínima (P6 no consume
+// email/telefono/canal_preferido, así que no se exponen aquí aunque ya sean
+// públicos en otro endpoint — defensa en profundidad, no una ampliación de
+// riesgo). Mismo cap `.take(500)` y mismo límite ya documentado arriba (no es
+// paginación real, JOS-31 sigue pendiente): `total` es la suma de las filas
+// cargadas, no un conteo real de todo el pipeline si se supera el cap — el
+// frontend lo comunica explícitamente ("Mostrando hasta 500 clientes") en vez
+// de disfrazarlo de total real.
+export async function obtenerPipeline(ctx: QueryCtx) {
+  const clientes = await ctx.db
+    .query("clientes")
+    .withIndex("by_fecha_alta")
+    .order("desc")
+    .take(500);
+
+  const grupos = ORDEN_FASES.map((fase) => ({
+    fase,
+    clientes: clientes
+      .filter((c) => c.fase === fase)
+      .map((c) => ({
+        _id: c._id,
+        nombre: c.nombre,
+        empresa: c.empresa,
+        prioridad: c.prioridad,
+        fecha_ultimo_contacto: c.fecha_ultimo_contacto,
+      })),
+  }));
+
+  return { grupos, total: clientes.length };
 }

@@ -40,6 +40,31 @@
   --color-priority-low-bg: #dcfce7;
   --color-priority-low-text: #15803d;
 
+  /* JOS-14: colores por fase del pipeline, verificados en el array SCLR de
+   * sPipeline() en crm-app.js (fuente de verdad ejecutada) — se ignora
+   * _ds_ref/tokens/colors.css: ese archivo define un set de nombres/valores
+   * para un concepto distinto (lead/interested/quote/won/inactive/lost) que
+   * no coincide ni en nombre ni en hex con las 6 fases reales del pipeline
+   * lineal actual, mismo criterio ya aplicado en priorityStyles.ts. */
+  --color-pipeline-lead-dot: #3b82f6;
+  --color-pipeline-lead-bg: #dbeafe;
+  --color-pipeline-lead-text: #1e40af;
+  --color-pipeline-cualificacion-dot: #8b5cf6;
+  --color-pipeline-cualificacion-bg: #ede9fe;
+  --color-pipeline-cualificacion-text: #5b21b6;
+  --color-pipeline-primera_llamada-dot: #f59e0b;
+  --color-pipeline-primera_llamada-bg: #fef3c7;
+  --color-pipeline-primera_llamada-text: #92400e;
+  --color-pipeline-propuesta_enviada-dot: #16a34a;
+  --color-pipeline-propuesta_enviada-bg: #f0fdf4;
+  --color-pipeline-propuesta_enviada-text: #15803d;
+  --color-pipeline-negociacion-dot: #ec4899;
+  --color-pipeline-negociacion-bg: #fce7f3;
+  --color-pipeline-negociacion-text: #9d174d;
+  --color-pipeline-cerrado-dot: #10b981;
+  --color-pipeline-cerrado-bg: #d1fae5;
+  --color-pipeline-cerrado-text: #065f46;
+
   /* No existe un token de error dedicado en _ds_ref/colors.css; se reutiliza el
    * mismo rojo que priority-high (JOS-12: mensajes de validación del formulario). */
   --color-error-text: #b91c1c;

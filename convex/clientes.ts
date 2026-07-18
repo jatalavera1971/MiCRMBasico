@@ -3,12 +3,14 @@ import { mutation, query } from "./_generated/server";
 import {
   actualizarCanalPreferido as actualizarCanalPreferidoModel,
   actualizarCliente as actualizarClienteModel,
+  actualizarFase as actualizarFaseModel,
   actualizarPrioridad as actualizarPrioridadModel,
   crearCliente as crearClienteModel,
   eliminarCliente as eliminarClienteModel,
   listarClientes as listarClientesModel,
   listarClientesInactivos as listarClientesInactivosModel,
   obtenerCliente as obtenerClienteModel,
+  obtenerPipeline as obtenerPipelineModel,
 } from "./model/clientes";
 
 // Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
@@ -122,6 +124,43 @@ export const actualizarPrioridad = mutation({
   },
   handler: async (ctx, args) => {
     return actualizarPrioridadModel(ctx, args);
+  },
+});
+
+// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
+// construido todavía. Desplegada igualmente en Railway con este riesgo aceptado
+// explícitamente desde 2026-07-12 — ver README.md. Edición rápida de grano fino
+// (JOS-14/15, chips de fase de la ficha/pipeline) — mismo riesgo ampliado de
+// actualizarCliente, aceptado explícitamente el 17 jul 2026.
+export const actualizarFase = mutation({
+  args: {
+    clienteId: v.id("clientes"),
+    fase: v.union(
+      v.literal("lead"),
+      v.literal("cualificacion"),
+      v.literal("primera_llamada"),
+      v.literal("propuesta_enviada"),
+      v.literal("negociacion"),
+      v.literal("cerrado"),
+    ),
+  },
+  handler: async (ctx, args) => {
+    return actualizarFaseModel(ctx, args);
+  },
+});
+
+// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
+// construido todavía. Desplegada igualmente en Railway con este riesgo aceptado
+// explícitamente desde 2026-07-12 — ver README.md. JOS-14 (vista Pipeline P6):
+// agrupa clientes por fase con una proyección propia y mínima (sin email/
+// telefono/canal_preferido, que P6 no consume) — no amplía superficie de
+// lectura respecto a listarClientes, la reduce para este endpoint concreto.
+// Mismo cap `.take(500)` ya documentado en listarClientes: `total` es la suma
+// de filas cargadas, no un conteo real si se supera el cap.
+export const obtenerPipeline = query({
+  args: {},
+  handler: async (ctx) => {
+    return obtenerPipelineModel(ctx);
   },
 });
 

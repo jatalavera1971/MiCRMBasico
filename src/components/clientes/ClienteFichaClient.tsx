@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   Building2,
   Calendar,
-  Check,
   ChevronDown,
   Clock,
   Mail,
@@ -23,15 +22,16 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { getInitials, type ClienteListado } from "./ClienteRow";
 import {
   CANAL_LABELS,
-  FASES,
   FASE_LABELS,
   TIPO_INTERACCION_LABELS,
   type CanalPreferido,
+  type Fase,
   type TipoInteraccion,
 } from "@/lib/clienteLabels";
 import { formatFechaCorta, formatFechaRecordatorio } from "@/lib/dates";
 import { PRIORITY_STYLES, type Prioridad } from "./priorityStyles";
 import { PrioritySheet } from "./PrioritySheet";
+import { FaseChips } from "./FaseChips";
 import { ClientMenuSheet } from "./ClientMenuSheet";
 import { RegisterInteractionSheet } from "./RegisterInteractionSheet";
 import { RecordatorioSheet, type RecordatorioEditable } from "./RecordatorioSheet";
@@ -39,8 +39,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Toast } from "@/components/ui/Toast";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
-// JOS-11 (Fase 2): solo canal preferido es editable desde aquí (F1). Pipeline
-// (F6/JOS-15) sigue reservado, es de Fase 3.
+// JOS-11 (Fase 2): canal preferido editable desde aquí (F1).
 const CANAL_BOTONES = [
   { key: "telefono", label: "Llamar", icon: Phone },
   { key: "whatsapp", label: "WhatsApp", icon: MessageCircle },
@@ -89,6 +88,7 @@ export function ClienteFichaClient({
   const [toast, setToast] = useState<string | null>(null);
   const [prioritySheetOpen, setPrioritySheetOpen] = useState(false);
   const [savingPrioridad, setSavingPrioridad] = useState(false);
+  const [savingFase, setSavingFase] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -102,6 +102,7 @@ export function ClienteFichaClient({
     useState<RecordatorioPendiente | null>(null);
   const actualizarCanalPreferido = useMutation(api.clientes.actualizarCanalPreferido);
   const actualizarPrioridad = useMutation(api.clientes.actualizarPrioridad);
+  const actualizarFase = useMutation(api.clientes.actualizarFase);
   const eliminarCliente = useMutation(api.clientes.eliminarCliente);
   const marcarComoHecho = useMutation(api.recordatorios.marcarComoHecho);
 
@@ -119,7 +120,6 @@ export function ClienteFichaClient({
   }
 
   const prioridad = PRIORITY_STYLES[cliente.prioridad];
-  const faseIdx = FASES.indexOf(cliente.fase);
   const historialAMostrar =
     interacciones.length > 10 && !historialExpandido
       ? interacciones.slice(0, 5)
@@ -147,6 +147,26 @@ export function ClienteFichaClient({
     } catch {
       setCliente((c) => ({ ...c, canal_preferido: anterior }));
       setToast("No se pudo actualizar el canal preferido. Inténtalo de nuevo.");
+    }
+  }
+
+  // JOS-14/15: mismo patrón optimista que handleCanalClick, más guarda de
+  // concurrencia (savingFase) — sin ella, varios taps rápidos sobre chips
+  // distintos podrían resolver fuera de orden y dejar la fase guardada en BD
+  // distinta de la última elegida (hallazgo de la ronda de auditoría del plan).
+  async function handleFaseClick(nueva: Fase) {
+    if (savingFase || nueva === cliente.fase) return;
+    const anterior = cliente.fase;
+    setSavingFase(true);
+    setCliente((c) => ({ ...c, fase: nueva }));
+    try {
+      await actualizarFase({ clienteId: cliente._id, fase: nueva });
+      setToast(`Fase: ${FASE_LABELS[nueva]}`);
+    } catch {
+      setCliente((c) => ({ ...c, fase: anterior }));
+      setToast("No se pudo actualizar la fase. Inténtalo de nuevo.");
+    } finally {
+      setSavingFase(false);
     }
   }
 
@@ -358,7 +378,7 @@ export function ClienteFichaClient({
 
       <div className="h-2 bg-bg-app" />
 
-      {/* Pipeline — reservado (F6/JOS-15, Fase 3): solo lectura, sin onClick */}
+      {/* Pipeline (JOS-14/15): chips clicables, cambio de fase instantáneo */}
       <div className="bg-surface px-4 py-4">
         <div className="mb-2.5 flex items-center justify-between">
           <span className="text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">
@@ -368,27 +388,11 @@ export function ClienteFichaClient({
             {FASE_LABELS[cliente.fase]}
           </span>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          {FASES.map((fase, i) => {
-            const done = i < faseIdx;
-            const active = i === faseIdx;
-            return (
-              <span
-                key={fase}
-                className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-xs ${
-                  active
-                    ? "bg-primary-600 font-semibold text-white"
-                    : done
-                      ? "border border-[#BBF7D0] bg-primary-50 text-primary-600"
-                      : "border border-border text-text-tertiary"
-                }`}
-              >
-                {done ? <Check className="h-3 w-3" strokeWidth={2} /> : null}
-                {FASE_LABELS[fase]}
-              </span>
-            );
-          })}
-        </div>
+        <FaseChips
+          fase={cliente.fase}
+          onSelect={handleFaseClick}
+          disabled={savingFase}
+        />
       </div>
 
       <div className="h-2 bg-bg-app" />

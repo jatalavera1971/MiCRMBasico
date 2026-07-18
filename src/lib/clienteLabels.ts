@@ -15,9 +15,8 @@ export const FASE_LABELS: Record<Fase, string> = {
   cerrado: "Cerrado",
 };
 
-// JOS-11: orden real del pipeline, para pintar los chips de fase de la ficha
-// en modo solo-lectura (F6/JOS-15, cambio de fase, es de Fase 3 — no se
-// implementa todavía, solo se reserva el espacio visual con datos reales).
+// JOS-11/14/15: orden real del pipeline, usado por FaseChips (ficha y
+// pipeline) y por la vista Pipeline (P6) para pintar los grupos por fase.
 export const FASES: Fase[] = [
   "lead",
   "cualificacion",

@@ -11,15 +11,37 @@ import {
   listarClientesInactivos as listarClientesInactivosModel,
   obtenerCliente as obtenerClienteModel,
   obtenerPipeline as obtenerPipelineModel,
+  reactivar as reactivarModel,
 } from "./model/clientes";
 
 // Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
 // construido todavía. Desplegada igualmente en Railway con este riesgo
-// aceptado explícitamente desde 2026-07-12 — ver README.md.
+// aceptado explícitamente desde 2026-07-12 — ver README.md. JOS-26 (19 jul
+// 2026) amplió la proyección: además de `_id/nombre/empresa/fecha_ultimo_contacto`
+// ahora también expone `prioridad` (ya pública vía listarClientes/obtenerPipeline)
+// y `diasSinContacto` (derivado de fecha_ultimo_contacto, ya público) — no
+// amplía el riesgo de PII ya aceptado. Sin cap: lee todos los clientes
+// inactivos existentes (ver comentario en convex/model/clientes.ts), el límite
+// de 500 filas visibles es solo de renderizado en el frontend.
 export const listarClientesInactivos = query({
   args: {},
   handler: async (ctx) => {
     return listarClientesInactivosModel(ctx);
+  },
+});
+
+// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
+// construido todavía. Desplegada igualmente en Railway con este riesgo
+// aceptado explícitamente desde 2026-07-12 — ver README.md. JOS-26 (P7,
+// "Reactivar"): actualiza fecha_ultimo_contacto a la hora actual SIN crear un
+// registro de interacción — deliberadamente distinta de crearInteraccion.
+// Valida server-side que el cliente siga siendo inactivo antes de aplicar el
+// cambio (ver convex/model/clientes.ts:reactivar) para que un clienteId válido
+// no pueda usarse para tocar la fecha de un cliente que no está inactivo.
+export const reactivar = mutation({
+  args: { clienteId: v.id("clientes") },
+  handler: async (ctx, { clienteId }) => {
+    return reactivarModel(ctx, { clienteId });
   },
 });
 

@@ -15,12 +15,24 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // historial que analizar"). No confiamos solo en el rango del índice para esto:
 // filtramos el ausente explícitamente en código.
 //
-// Proyección explícita (JOS-12, ronda 3 de auditoría): esta query es pública y
-// sin auth; ahora que `clientes` tiene email/telefono/prioridad/fecha_alta, hay
-// que seguir devolviendo solo lo que consume /inactivos (_id/nombre/empresa/
-// fecha_ultimo_contacto), no el documento completo.
+// Proyección explícita (JOS-12, ronda 3 de auditoría; ampliada JOS-26): esta
+// query es pública y sin auth; devuelve solo lo que consume /inactivos
+// (_id/nombre/empresa/fecha_ultimo_contacto/prioridad/diasSinContacto), no el
+// documento completo. `prioridad` ya era pública vía listarClientes/obtenerPipeline;
+// `diasSinContacto` es derivado de fecha_ultimo_contacto (ya público), no amplía
+// el riesgo de PII ya aceptado (ver README.md).
+//
+// Sin .take(): a diferencia de listarClientes/obtenerPipeline, aquí NO se capa
+// la query (JOS-26, auditoría del plan). Un .take() antes del .filter() de la
+// línea de abajo podría consumir cupo con documentos sin fecha_ultimo_contacto
+// que el índice no garantiza excluir (ver comentario de arriba), devolviendo
+// menos inactivos reales de los que hay — y este mismo resultado alimenta el
+// contador exacto del banner de P1 (dashboard.ts:obtenerResumen). El cap de
+// renderizado (500 filas) se aplica solo en el frontend (InactivosListClient),
+// nunca aquí: la query sigue leyendo todos los clientes inactivos existentes.
 export async function listarClientesInactivos(ctx: QueryCtx) {
-  const umbral = Date.now() - INACTIVITY_WINDOW_MS;
+  const ahora = Date.now();
+  const umbral = ahora - INACTIVITY_WINDOW_MS;
   const candidatos = await ctx.db
     .query("clientes")
     .withIndex("by_fecha_ultimo_contacto", (q) =>
@@ -35,6 +47,8 @@ export async function listarClientesInactivos(ctx: QueryCtx) {
       nombre: c.nombre,
       empresa: c.empresa,
       fecha_ultimo_contacto: c.fecha_ultimo_contacto,
+      prioridad: c.prioridad,
+      diasSinContacto: Math.floor((ahora - c.fecha_ultimo_contacto!) / DAY_MS),
     }));
 }
 
@@ -227,6 +241,40 @@ export async function actualizarFase(
     throw new ConvexError("Cliente no encontrado");
   }
   await ctx.db.patch(args.clienteId, { fase: args.fase });
+}
+
+// JOS-26 (P7): "Reactivar" desde la lista de inactivos — a diferencia de
+// crearInteraccion (que solo avanza fecha_ultimo_contacto hacia delante y
+// siempre inserta un registro de interacción), esto es un patch directo, sin
+// interacción asociada: pensado para cuando Carlos sabe que el cliente sigue
+// activo pero aún no ha anotado el contacto real.
+//
+// Validación de inactividad server-side (auditoría del plan, bloqueante):
+// sin este chequeo, cualquier caller público con un clienteId válido podría
+// "tocar" fecha_ultimo_contacto de un cliente que NO está inactivo (activo,
+// recién creado, o ya reactivado por otra pestaña) — rompería el contrato de
+// fecha_ultimo_contacto (schema.ts) fuera del flujo auditado de
+// interacciones.ts. La validez de la nueva fecha depende solo de este chequeo,
+// no de una comparación con el valor anterior — aunque en la práctica siempre
+// avanza, porque el chequeo ya exige que la fecha anterior estuviera a más de
+// 7 días en el pasado.
+export async function reactivar(
+  ctx: MutationCtx,
+  args: { clienteId: Id<"clientes"> },
+) {
+  const cliente = await ctx.db.get(args.clienteId);
+  if (!cliente) {
+    throw new ConvexError("Cliente no encontrado");
+  }
+  const ahora = Date.now();
+  const umbral = ahora - INACTIVITY_WINDOW_MS;
+  const esInactivo =
+    cliente.fecha_ultimo_contacto !== undefined &&
+    cliente.fecha_ultimo_contacto < umbral;
+  if (!esInactivo) {
+    throw new ConvexError("Este cliente ya no está inactivo");
+  }
+  await ctx.db.patch(args.clienteId, { fecha_ultimo_contacto: ahora });
 }
 
 // JOS-11/JOS-18: borrado permanente en cascada sobre `recordatorios` e

@@ -4,11 +4,12 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { esFechaISOValida } from "./validacionFechas";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-// JOS-21 (16 jul 2026): crearInteraccion puede crear recordatorios públicos y
-// sin autenticación vía "próximo paso"; JOS-22 (17 jul 2026) añade además
-// crearRecordatorio, una segunda vía de escritura pública directa — antes de
-// JOS-21 esta tabla solo crecía por seeds internos, nunca por una mutation
-// pública, así que un .collect() sin tope aquí no era explotable. Mismo tipo
+// JOS-21 (16 jul 2026): crearInteraccion puede crear recordatorios vía
+// "próximo paso"; JOS-22 (17 jul 2026) añade además crearRecordatorio, una
+// segunda vía de escritura directa — ambas exigen sesión desde JOS-60/61,
+// pero sin scoping por rol. Antes de JOS-21 esta tabla solo crecía por seeds
+// internos, nunca por una mutation pública, así que un .collect() sin tope
+// aquí no era explotable. Mismo tipo
 // de mitigación ya aceptado en listarClientes (convex/model/clientes.ts): no
 // es paginación real, acota el coste de la consulta ante un posible ataque
 // de volumen; si el total de pendientes supera este tope, deja de cubrir el
@@ -121,9 +122,9 @@ export async function crearRecordatorio(
 // JOS-22: edita fecha/motivo de un recordatorio ya existente desde la ficha.
 // Orden de validación deliberado: (1) existe; (2) pertenece al cliente de la
 // ficha desde la que se edita — mitigación de CONTRATO, no un control de
-// autorización real: sin autenticación, cualquiera que conozca ambos ids
-// podría seguir editándolo; deja el contrato listo para cuando exista auth
-// real (JOS-60/61); (3) sigue pendiente (uno ya "hecho" no se edita desde
+// autorización real: con sesión exigida desde JOS-60/61 pero sin scoping por
+// rol, cualquier usuario autenticado que conozca ambos ids podría seguir
+// editándolo; (3) sigue pendiente (uno ya "hecho" no se edita desde
 // aquí ni conociendo su id — JOS-22 solo describe gestión de pendientes);
 // (4) fecha/motivo válidos.
 export async function actualizarRecordatorio(

@@ -15,8 +15,9 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // historial que analizar"). No confiamos solo en el rango del índice para esto:
 // filtramos el ausente explícitamente en código.
 //
-// Proyección explícita (JOS-12, ronda 3 de auditoría; ampliada JOS-26): esta
-// query es pública y sin auth; devuelve solo lo que consume /inactivos
+// Proyección explícita (JOS-12, ronda 3 de auditoría; ampliada JOS-26): el
+// wrapper público exige sesión (JOS-60/61), pero sin scoping por rol —
+// devuelve solo lo que consume /inactivos
 // (_id/nombre/empresa/fecha_ultimo_contacto/prioridad/diasSinContacto), no el
 // documento completo. `prioridad` ya era pública vía listarClientes/obtenerPipeline;
 // `diasSinContacto` es derivado de fecha_ultimo_contacto (ya público), no amplía
@@ -279,8 +280,9 @@ export async function reactivar(
 
 // JOS-11/JOS-18: borrado permanente en cascada sobre `recordatorios` e
 // `interacciones` (esta última añadida en JOS-18/19/20/21, F4). Riesgo de
-// seguridad ampliado (mutation pública sin auth capaz de borrar datos reales
-// de forma permanente) aceptado explícitamente el 15 jul 2026 — ver README.
+// seguridad ampliado (mutation capaz de borrar datos reales de forma
+// permanente, sin scoping por rol desde JOS-60/61) aceptado explícitamente
+// el 15 jul 2026 — ver README.
 export async function eliminarCliente(
   ctx: MutationCtx,
   args: { clienteId: Id<"clientes"> },
@@ -308,8 +310,9 @@ export async function eliminarCliente(
 // texto/prioridad y el orden por prioridad+antigüedad de contacto se hacen en
 // el cliente (ver ClientesListClient.tsx), aquí solo se acota el volumen y se
 // proyecta. Proyección explícita (misma razón que listarClientesInactivos
-// arriba): esta query es pública y sin auth, así que solo devuelve los 9 campos
-// que P2 consume de verdad — nunca fecha_alta (no se usa aquí), pero SÍ
+// arriba): el wrapper exige sesión pero sin scoping por rol, así que solo
+// devuelve los 9 campos que P2 consume de verdad — nunca fecha_alta (no se
+// usa aquí), pero SÍ
 // telefono/empresa/canal_preferido/fase/fecha_ultimo_contacto, que antes de
 // esta pantalla no se exponían. Es un escalón adicional del riesgo de PII ya
 // aceptado (ver README) — telefono y fecha_ultimo_contacto (actividad

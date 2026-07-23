@@ -150,7 +150,8 @@ export async function crearInteraccion(
 // en orden ascendente por defecto (equivalente a _creationTime ascendente,
 // ya que el índice solo indexa cliente_id) y un cliente con más de 500 filas
 // perdería bajo el cap las interacciones más NUEVAS, no las más viejas —
-// especialmente relevante porque la escritura es pública sin auth. Con
+// especialmente relevante porque la escritura la puede hacer cualquier
+// usuario autenticado, sin scoping por rol (JOS-60/61). Con
 // "desc" se toman las 500 filas creadas más recientemente; dentro de ese
 // conjunto ya acotado se ordena en memoria por `fecha` (fecha real de la
 // interacción, que puede estar retro-fechada) y, en empate del mismo día,

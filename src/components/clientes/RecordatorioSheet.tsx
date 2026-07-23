@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useMutation } from "convex/react";
-import { ConvexError } from "convex/values";
 import { X } from "lucide-react";
-import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import {
+  actualizarRecordatorioAction,
+  crearRecordatorioAction,
+} from "@/lib/actions/recordatorios";
 import { Field, getInputClassName } from "./ClientFormFields";
 import { hoyFechaISO, sumarDiasFechaISO } from "@/lib/dates";
 
@@ -45,10 +46,6 @@ export function RecordatorioSheet({
   onSaved: (mensaje: string) => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const crearRecordatorio = useMutation(api.recordatorios.crearRecordatorio);
-  const actualizarRecordatorio = useMutation(
-    api.recordatorios.actualizarRecordatorio,
-  );
 
   const [fecha, setFecha] = useState(hoyFechaISO());
   const [motivo, setMotivo] = useState("");
@@ -81,24 +78,22 @@ export function RecordatorioSheet({
     setGuardando(true);
     setError(null);
     try {
-      if (editando) {
-        await actualizarRecordatorio({
-          recordatorioId: recordatorio._id,
-          clienteId,
-          fecha,
-          motivo,
-        });
-        onSaved("Recordatorio actualizado");
-      } else {
-        await crearRecordatorio({ clienteId, fecha, motivo });
-        onSaved("Recordatorio creado");
+      const result = editando
+        ? await actualizarRecordatorioAction({
+            recordatorioId: recordatorio._id,
+            clienteId,
+            fecha,
+            motivo,
+          })
+        : await crearRecordatorioAction({ clienteId, fecha, motivo });
+      if (!result.ok) {
+        setError(result.error);
+        setGuardando(false);
+        return;
       }
-    } catch (err) {
-      const mensaje =
-        err instanceof ConvexError
-          ? String(err.data)
-          : "No se pudo guardar el recordatorio. Inténtalo de nuevo.";
-      setError(mensaje);
+      onSaved(editando ? "Recordatorio actualizado" : "Recordatorio creado");
+    } catch {
+      setError("No se pudo guardar el recordatorio. Inténtalo de nuevo.");
       setGuardando(false);
     }
   }

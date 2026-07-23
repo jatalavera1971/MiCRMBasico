@@ -1,19 +1,18 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireSesion as requireSesionModel } from "./model/auth";
 import {
   crearInteraccion as crearInteraccionModel,
   listarInteracciones as listarInteraccionesModel,
 } from "./model/interacciones";
 
-// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
-// construido todavía. Desplegada igualmente en Railway con este riesgo
-// aceptado explícitamente desde 2026-07-12 — ver README.md. JOS-18/19/20/21
-// (16 jul 2026): primera función pública que escribe texto libre sobre las
-// conversaciones con un cliente (hasta ahora solo había PII de contacto) —
-// riesgo ampliado aceptado explícitamente el 16 jul 2026, mitigado con
-// límites de longitud y validación de fechas server-side (ver
-// convex/model/interacciones.ts:validarDatosInteraccion — nunca confiar solo
-// en el maxLength/max del formulario en cliente).
+// JOS-60/61 (23 jul 2026): ambas funciones exigen ahora `token` de sesión
+// válido (requireSesionModel) — ver la misma nota en convex/clientes.ts y el
+// detalle del riesgo residual en README.md.
+
+// JOS-18/19/20/21 (16 jul 2026): escribe texto libre sobre las conversaciones
+// con un cliente — límites de longitud y validación de fechas server-side
+// (ver convex/model/interacciones.ts:validarDatosInteraccion).
 export const crearInteraccion = mutation({
   args: {
     clienteId: v.id("clientes"),
@@ -27,23 +26,20 @@ export const crearInteraccion = mutation({
     fecha: v.number(),
     proximoPasoTexto: v.optional(v.string()),
     proximoPasoFecha: v.optional(v.string()),
+    token: v.string(),
   },
   handler: async (ctx, args) => {
+    await requireSesionModel(ctx, args.token);
     return crearInteraccionModel(ctx, args);
   },
 });
 
-// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
-// construido todavía. Desplegada igualmente en Railway con este riesgo
-// aceptado explícitamente desde 2026-07-12 — ver README.md. Mismo riesgo
-// ampliado que crearInteraccion (16 jul 2026): cualquiera con la URL de la
-// app y el id de un cliente (ya público hoy vía listarClientes) puede leer
-// las notas de texto libre de sus interacciones. Cap `.take(500)` y orden
-// por _creationTime desc ya aplicados dentro del modelo — ver
-// convex/model/interacciones.ts:listarInteracciones.
+// Cap `.take(500)` y orden por _creationTime desc ya aplicados dentro del
+// modelo — ver convex/model/interacciones.ts:listarInteracciones.
 export const listarInteracciones = query({
-  args: { clienteId: v.id("clientes") },
+  args: { clienteId: v.id("clientes"), token: v.string() },
   handler: async (ctx, args) => {
-    return listarInteraccionesModel(ctx, args);
+    await requireSesionModel(ctx, args.token);
+    return listarInteraccionesModel(ctx, { clienteId: args.clienteId });
   },
 });

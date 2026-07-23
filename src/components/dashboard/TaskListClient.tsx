@@ -2,10 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation } from "convex/react";
 import { CheckCircle2 } from "lucide-react";
-import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { marcarComoHechoAction } from "@/lib/actions/recordatorios";
 import { TaskListItem, type Tarea } from "./TaskListItem";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -17,7 +16,6 @@ export function TaskListClient({
   tareasIniciales: Tarea[];
 }) {
   const router = useRouter();
-  const marcarComoHecho = useMutation(api.recordatorios.marcarComoHecho);
   const [tareas, setTareas] = useState(tareasIniciales);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [confirmTarea, setConfirmTarea] = useState<Tarea | null>(null);
@@ -34,9 +32,10 @@ export function TaskListClient({
       prev.filter((t) => t.recordatorioId !== tarea.recordatorioId),
     );
     try {
-      await marcarComoHecho({
+      const result = await marcarComoHechoAction({
         recordatorioId: tarea.recordatorioId as Id<"recordatorios">,
       });
+      if (!result.ok) throw new Error(result.error);
       // Resincroniza KPIs/banner (obtenerResumen) con el backend.
       router.refresh();
     } catch {

@@ -8,9 +8,12 @@
  * @module
  */
 
+import type * as auth from "../auth.js";
 import type * as clientes from "../clientes.js";
+import type * as crons from "../crons.js";
 import type * as dashboard from "../dashboard.js";
 import type * as interacciones from "../interacciones.js";
+import type * as model_auth from "../model/auth.js";
 import type * as model_clientes from "../model/clientes.js";
 import type * as model_interacciones from "../model/interacciones.js";
 import type * as model_recordatorios from "../model/recordatorios.js";
@@ -26,9 +29,12 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  auth: typeof auth;
   clientes: typeof clientes;
+  crons: typeof crons;
   dashboard: typeof dashboard;
   interacciones: typeof interacciones;
+  "model/auth": typeof model_auth;
   "model/clientes": typeof model_clientes;
   "model/interacciones": typeof model_interacciones;
   "model/recordatorios": typeof model_recordatorios;

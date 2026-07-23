@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useMutation } from "convex/react";
-import { ConvexError } from "convex/values";
 import { X } from "lucide-react";
-import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { crearInteraccionAction } from "@/lib/actions/interacciones";
 import { Field, getInputClassName } from "./ClientFormFields";
 import { InteractionTypeSelector } from "./InteractionTypeSelector";
 import type { TipoInteraccion } from "@/lib/clienteLabels";
@@ -30,7 +28,6 @@ export function RegisterInteractionSheet({
   onSaved: (mensaje: string) => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const crearInteraccion = useMutation(api.interacciones.crearInteraccion);
 
   const [tipo, setTipo] = useState<TipoInteraccion>("llamada");
   const [notas, setNotas] = useState("");
@@ -71,7 +68,7 @@ export function RegisterInteractionSheet({
     setGuardando(true);
     setError(null);
     try {
-      const resultado = await crearInteraccion({
+      const resultado = await crearInteraccionAction({
         clienteId,
         tipo,
         notas,
@@ -79,17 +76,18 @@ export function RegisterInteractionSheet({
         proximoPasoTexto: proximoPasoTexto || undefined,
         proximoPasoFecha: proximoPasoFecha || undefined,
       });
+      if (!resultado.ok) {
+        setError(resultado.error);
+        setGuardando(false);
+        return;
+      }
       const mensaje =
         resultado.recordatorioCreado && resultado.recordatorioFecha
           ? `Recordatorio creado para el ${formatFechaCorta(resultado.recordatorioFecha)}`
           : "Interacción registrada";
       onSaved(mensaje);
-    } catch (err) {
-      const mensaje =
-        err instanceof ConvexError
-          ? String(err.data)
-          : "No se pudo registrar la interacción. Inténtalo de nuevo.";
-      setError(mensaje);
+    } catch {
+      setError("No se pudo registrar la interacción. Inténtalo de nuevo.");
       setGuardando(false);
     }
   }

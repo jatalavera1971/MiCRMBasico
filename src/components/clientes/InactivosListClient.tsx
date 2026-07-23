@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation } from "convex/react";
 import { CheckCircle2 } from "lucide-react";
-import { api } from "../../../convex/_generated/api";
+import { reactivarAction } from "@/lib/actions/clientes";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Toast } from "@/components/ui/Toast";
@@ -34,8 +33,6 @@ export function InactivosListClient({
   const [reactivandoId, setReactivandoId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const reactivar = useMutation(api.clientes.reactivar);
-
   const visibles = clientes.slice(0, CLIENTES_INACTIVOS_CAP);
 
   async function handleConfirmReactivar() {
@@ -44,7 +41,8 @@ export function InactivosListClient({
     setConfirmTarget(null);
     setReactivandoId(target._id);
     try {
-      await reactivar({ clienteId: target._id });
+      const result = await reactivarAction({ clienteId: target._id });
+      if (!result.ok) throw new Error(result.error);
       setClientes((prev) => prev.filter((c) => c._id !== target._id));
       setToast(`${target.nombre} marcado como activo`);
     } catch {

@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireSesion as requireSesionModel } from "./model/auth";
 import {
   actualizarCanalPreferido as actualizarCanalPreferidoModel,
   actualizarCliente as actualizarClienteModel,
@@ -14,43 +15,40 @@ import {
   reactivar as reactivarModel,
 } from "./model/clientes";
 
-// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
-// construido todavía. Desplegada igualmente en Railway con este riesgo
-// aceptado explícitamente desde 2026-07-12 — ver README.md. JOS-26 (19 jul
-// 2026) amplió la proyección: además de `_id/nombre/empresa/fecha_ultimo_contacto`
-// ahora también expone `prioridad` (ya pública vía listarClientes/obtenerPipeline)
-// y `diasSinContacto` (derivado de fecha_ultimo_contacto, ya público) — no
-// amplía el riesgo de PII ya aceptado. Sin cap: lee todos los clientes
-// inactivos existentes (ver comentario en convex/model/clientes.ts), el límite
-// de 500 filas visibles es solo de renderizado en el frontend.
+// JOS-60/61 (23 jul 2026): todas las funciones de este archivo exigen ahora
+// `token` de sesión válido (requireSesionModel, ver convex/model/auth.ts) —
+// cierra el riesgo "pública y sin autenticación" que llevaban desde el
+// despliegue inicial (2026-07-12). Sin scoping por rol todavía (cualquier
+// usuario autenticado, Dueña o Comercial, puede llamar cualquiera de estas
+// funciones) — ver README.md para el detalle completo del riesgo residual.
+
+// JOS-26 (19 jul 2026) amplió la proyección: además de
+// `_id/nombre/empresa/fecha_ultimo_contacto` también expone `prioridad` y
+// `diasSinContacto`. Sin cap: lee todos los clientes inactivos existentes
+// (ver convex/model/clientes.ts), el límite de 500 filas visibles es solo de
+// renderizado en el frontend.
 export const listarClientesInactivos = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { token: v.string() },
+  handler: async (ctx, args) => {
+    await requireSesionModel(ctx, args.token);
     return listarClientesInactivosModel(ctx);
   },
 });
 
-// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
-// construido todavía. Desplegada igualmente en Railway con este riesgo
-// aceptado explícitamente desde 2026-07-12 — ver README.md. JOS-26 (P7,
-// "Reactivar"): actualiza fecha_ultimo_contacto a la hora actual SIN crear un
-// registro de interacción — deliberadamente distinta de crearInteraccion.
-// Valida server-side que el cliente siga siendo inactivo antes de aplicar el
-// cambio (ver convex/model/clientes.ts:reactivar) para que un clienteId válido
-// no pueda usarse para tocar la fecha de un cliente que no está inactivo.
+// JOS-26 (P7, "Reactivar"): actualiza fecha_ultimo_contacto a la hora actual
+// SIN crear un registro de interacción — deliberadamente distinta de
+// crearInteraccion. Valida server-side que el cliente siga siendo inactivo
+// antes de aplicar el cambio (ver convex/model/clientes.ts:reactivar).
 export const reactivar = mutation({
-  args: { clienteId: v.id("clientes") },
-  handler: async (ctx, { clienteId }) => {
+  args: { clienteId: v.id("clientes"), token: v.string() },
+  handler: async (ctx, { clienteId, token }) => {
+    await requireSesionModel(ctx, token);
     return reactivarModel(ctx, { clienteId });
   },
 });
 
-// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
-// construido todavía. Desplegada igualmente en Railway con este riesgo aceptado
-// explícitamente desde 2026-07-12 — ver README.md. Es la primera función pública
-// que CREA filas nuevas (hasta ahora solo había lecturas + un toggle de estado) —
-// riesgo de spam/PII falsa aceptado explícitamente el 2026-07-13, con límites de
-// longitud server-side (ver convex/model/clientes.ts) como única mitigación.
+// Primera función pública que CREA filas nuevas — riesgo de spam/PII falsa
+// mitigado con límites de longitud server-side (ver convex/model/clientes.ts).
 export const crearCliente = mutation({
   args: {
     nombre: v.string(),
@@ -58,48 +56,40 @@ export const crearCliente = mutation({
     empresa: v.optional(v.string()),
     telefono: v.optional(v.string()),
     prioridad: v.union(v.literal("alta"), v.literal("media"), v.literal("baja")),
+    token: v.string(),
   },
   handler: async (ctx, args) => {
+    await requireSesionModel(ctx, args.token);
     return crearClienteModel(ctx, args);
   },
 });
 
-// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
-// construido todavía. Desplegada igualmente en Railway con este riesgo aceptado
-// explícitamente desde 2026-07-12 — ver README.md. JOS-10/13/45 (13 jul 2026)
-// ampliaron su proyección: además de `nombre`/`email`/`prioridad` ahora también
-// expone `telefono`, `empresa`, `canal_preferido`, `fase` y `fecha_ultimo_contacto`
-// (necesarios para buscar/mostrar/ordenar en la pantalla "Clientes") — sigue
-// proyectando solo esos 9 campos, nunca el documento completo, pero ya no son
-// "solo 4 campos". La búsqueda de texto que consume esta query en el frontend
-// solo cubre los hasta 500 clientes que devuelve `.take(500)`, no toda la tabla
+// JOS-10/13/45 (13 jul 2026) ampliaron su proyección: además de
+// `nombre`/`email`/`prioridad` también expone `telefono`, `empresa`,
+// `canal_preferido`, `fase` y `fecha_ultimo_contacto`. Proyecta solo esos 9
+// campos, nunca el documento completo. Cap `.take(500)`, no paginación real
 // (ver convex/model/clientes.ts).
 export const listarClientes = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { token: v.string() },
+  handler: async (ctx, args) => {
+    await requireSesionModel(ctx, args.token);
     return listarClientesModel(ctx);
   },
 });
 
-// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
-// construido todavía. Desplegada igualmente en Railway con este riesgo aceptado
-// explícitamente desde 2026-07-12 — ver README.md. `clienteId` es v.string()
-// a propósito, no v.id("clientes") (ver convex/model/clientes.ts:obtenerCliente)
-// para que un id con formato inválido no falle en la validación de argumentos
-// del SDK antes de llegar al handler.
+// `clienteId` es v.string() a propósito, no v.id("clientes") (ver
+// convex/model/clientes.ts:obtenerCliente) para que un id con formato
+// inválido no falle en la validación de argumentos del SDK antes del handler.
 export const obtenerCliente = query({
-  args: { clienteId: v.string() },
-  handler: async (ctx, { clienteId }) => {
+  args: { clienteId: v.string(), token: v.string() },
+  handler: async (ctx, { clienteId, token }) => {
+    await requireSesionModel(ctx, token);
     return obtenerClienteModel(ctx, { clienteId });
   },
 });
 
-// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
-// construido todavía. Desplegada igualmente en Railway con este riesgo aceptado
-// explícitamente desde 2026-07-12 — ver README.md. JOS-11/P4 (edición, 15 jul
-// 2026): primera mutation pública capaz de MODIFICAR datos ya existentes de
-// cualquier cliente (hasta ahora solo se podía crear/leer/marcar recordatorios
-// hechos) — riesgo ampliado aceptado explícitamente el 15 jul 2026.
+// JOS-11/P4 (edición, 15 jul 2026): mutation capaz de MODIFICAR datos ya
+// existentes de cualquier cliente.
 export const actualizarCliente = mutation({
   args: {
     clienteId: v.id("clientes"),
@@ -108,17 +98,15 @@ export const actualizarCliente = mutation({
     empresa: v.optional(v.string()),
     telefono: v.optional(v.string()),
     prioridad: v.union(v.literal("alta"), v.literal("media"), v.literal("baja")),
+    token: v.string(),
   },
   handler: async (ctx, args) => {
+    await requireSesionModel(ctx, args.token);
     return actualizarClienteModel(ctx, args);
   },
 });
 
-// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
-// construido todavía. Desplegada igualmente en Railway con este riesgo aceptado
-// explícitamente desde 2026-07-12 — ver README.md. Edición rápida de grano fino
-// (JOS-11, selector de 4 botones de la ficha) — mismo riesgo ampliado de
-// actualizarCliente, aceptado explícitamente el 15 jul 2026.
+// Edición rápida de grano fino (JOS-11, selector de 4 botones de la ficha).
 export const actualizarCanalPreferido = mutation({
   args: {
     clienteId: v.id("clientes"),
@@ -128,32 +116,28 @@ export const actualizarCanalPreferido = mutation({
       v.literal("email"),
       v.literal("reunion"),
     ),
+    token: v.string(),
   },
   handler: async (ctx, args) => {
+    await requireSesionModel(ctx, args.token);
     return actualizarCanalPreferidoModel(ctx, args);
   },
 });
 
-// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
-// construido todavía. Desplegada igualmente en Railway con este riesgo aceptado
-// explícitamente desde 2026-07-12 — ver README.md. Edición rápida de grano fino
-// (JOS-44, bottom sheet de prioridad de la ficha) — mismo riesgo ampliado de
-// actualizarCliente, aceptado explícitamente el 15 jul 2026.
+// Edición rápida de grano fino (JOS-44, bottom sheet de prioridad de la ficha).
 export const actualizarPrioridad = mutation({
   args: {
     clienteId: v.id("clientes"),
     prioridad: v.union(v.literal("alta"), v.literal("media"), v.literal("baja")),
+    token: v.string(),
   },
   handler: async (ctx, args) => {
+    await requireSesionModel(ctx, args.token);
     return actualizarPrioridadModel(ctx, args);
   },
 });
 
-// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
-// construido todavía. Desplegada igualmente en Railway con este riesgo aceptado
-// explícitamente desde 2026-07-12 — ver README.md. Edición rápida de grano fino
-// (JOS-14/15, chips de fase de la ficha/pipeline) — mismo riesgo ampliado de
-// actualizarCliente, aceptado explícitamente el 17 jul 2026.
+// Edición rápida de grano fino (JOS-14/15, chips de fase de la ficha/pipeline).
 export const actualizarFase = mutation({
   args: {
     clienteId: v.id("clientes"),
@@ -165,36 +149,31 @@ export const actualizarFase = mutation({
       v.literal("negociacion"),
       v.literal("cerrado"),
     ),
+    token: v.string(),
   },
   handler: async (ctx, args) => {
+    await requireSesionModel(ctx, args.token);
     return actualizarFaseModel(ctx, args);
   },
 });
 
-// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
-// construido todavía. Desplegada igualmente en Railway con este riesgo aceptado
-// explícitamente desde 2026-07-12 — ver README.md. JOS-14 (vista Pipeline P6):
-// agrupa clientes por fase con una proyección propia y mínima (sin email/
-// telefono/canal_preferido, que P6 no consume) — no amplía superficie de
-// lectura respecto a listarClientes, la reduce para este endpoint concreto.
-// Mismo cap `.take(500)` ya documentado en listarClientes: `total` es la suma
-// de filas cargadas, no un conteo real si se supera el cap.
+// JOS-14 (vista Pipeline P6): agrupa clientes por fase con una proyección
+// propia y mínima (sin email/telefono/canal_preferido). Mismo cap `.take(500)`
+// ya documentado en listarClientes.
 export const obtenerPipeline = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { token: v.string() },
+  handler: async (ctx, args) => {
+    await requireSesionModel(ctx, args.token);
     return obtenerPipelineModel(ctx);
   },
 });
 
-// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
-// construido todavía. Desplegada igualmente en Railway con este riesgo aceptado
-// explícitamente desde 2026-07-12 — ver README.md. JOS-11 (15 jul 2026): primera
-// mutation pública capaz de BORRAR datos reales de forma permanente y en
-// cascada (el cliente y sus recordatorios) — riesgo ampliado aceptado
-// explícitamente el 15 jul 2026, mayor que crear/leer/actualizar.
+// JOS-11 (15 jul 2026): mutation capaz de BORRAR datos reales de forma
+// permanente y en cascada (el cliente y sus recordatorios/interacciones).
 export const eliminarCliente = mutation({
-  args: { clienteId: v.id("clientes") },
-  handler: async (ctx, { clienteId }) => {
+  args: { clienteId: v.id("clientes"), token: v.string() },
+  handler: async (ctx, { clienteId, token }) => {
+    await requireSesionModel(ctx, token);
     return eliminarClienteModel(ctx, { clienteId });
   },
 });

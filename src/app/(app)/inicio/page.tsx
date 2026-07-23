@@ -1,5 +1,7 @@
+import { redirect } from "next/navigation";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "../../../../convex/_generated/api";
+import { getSesionActual } from "@/lib/session";
 import { Greeting } from "@/components/dashboard/Greeting";
 import { KpiRow } from "@/components/dashboard/KpiRow";
 import { InactivityBanner } from "@/components/dashboard/InactivityBanner";
@@ -9,14 +11,17 @@ import { TaskListSection } from "@/components/dashboard/TaskListSection";
 export const dynamic = "force-dynamic";
 
 export default async function InicioPage() {
+  const sesion = await getSesionActual();
+  if (!sesion) redirect("/"); // defensivo — el layout ya garantiza esto, cache() lo hace barato
+
   const [resumen, tareas] = await Promise.all([
-    fetchQuery(api.dashboard.obtenerResumen, {}),
-    fetchQuery(api.recordatorios.listarSeguimientosHoy, {}),
+    fetchQuery(api.dashboard.obtenerResumen, { token: sesion.token }),
+    fetchQuery(api.recordatorios.listarSeguimientosHoy, { token: sesion.token }),
   ]);
 
   return (
     <div className="pb-6">
-      <Greeting />
+      <Greeting nombre={sesion.usuario.nombreCompleto} />
       <KpiRow
         leadsActivos={resumen.leadsActivos}
         ventasCerradas={resumen.ventasCerradas}

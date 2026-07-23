@@ -1,5 +1,6 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireSesion as requireSesionModel } from "./model/auth";
 import {
   actualizarRecordatorio as actualizarRecordatorioModel,
   crearRecordatorio as crearRecordatorioModel,
@@ -7,76 +8,70 @@ import {
   obtenerPendientesHoy,
 } from "./model/recordatorios";
 
-// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
-// construido todavía. Desplegada igualmente en Railway con este riesgo
-// aceptado explícitamente desde 2026-07-12 — ver README.md.
+// JOS-60/61 (23 jul 2026): todas las funciones de este archivo exigen ahora
+// `token` de sesión válido (requireSesionModel) — ver la misma nota en
+// convex/clientes.ts y el detalle del riesgo residual en README.md.
+
 export const listarSeguimientosHoy = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { token: v.string() },
+  handler: async (ctx, args) => {
+    await requireSesionModel(ctx, args.token);
     return obtenerPendientesHoy(ctx);
   },
 });
 
-// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
-// construido todavía. Desplegada igualmente en Railway con este riesgo
-// aceptado explícitamente desde 2026-07-12 — ver README.md. JOS-22 (17 jul
-// 2026): lista completa de recordatorios pendientes de un cliente, para la
-// sección "Próximo recordatorio" (el primero) y su "Ver todos" (el resto) —
-// sustituye a la anterior obtenerProximoRecordatorio (JOS-21), que solo
-// devolvía uno.
+// JOS-22 (17 jul 2026): lista completa de recordatorios pendientes de un
+// cliente, para la sección "Próximo recordatorio" (el primero) y su "Ver
+// todos" (el resto).
 export const listarRecordatoriosPendientes = query({
-  args: { clienteId: v.id("clientes") },
+  args: { clienteId: v.id("clientes"), token: v.string() },
   handler: async (ctx, args) => {
-    return listarRecordatoriosPendientesModel(ctx, args);
+    await requireSesionModel(ctx, args.token);
+    return listarRecordatoriosPendientesModel(ctx, {
+      clienteId: args.clienteId,
+    });
   },
 });
 
-// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
-// construido todavía. Desplegada igualmente en Railway con este riesgo
-// aceptado explícitamente desde 2026-07-12 — ver README.md. JOS-22 (17 jul
-// 2026): primera mutation pública que CREA un recordatorio directamente
-// desde la ficha, sin pasar por una interacción (hasta ahora solo existía el
-// efecto automático de crearInteraccion) — riesgo ampliado aceptado
-// explícitamente el 17 jul 2026, con límites de longitud/fecha server-side
-// (ver convex/model/recordatorios.ts:validarDatosRecordatorio).
+// JOS-22 (17 jul 2026): crea un recordatorio directamente desde la ficha, sin
+// pasar por una interacción — límites de longitud/fecha server-side (ver
+// convex/model/recordatorios.ts:validarDatosRecordatorio).
 export const crearRecordatorio = mutation({
-  args: { clienteId: v.id("clientes"), fecha: v.string(), motivo: v.string() },
+  args: {
+    clienteId: v.id("clientes"),
+    fecha: v.string(),
+    motivo: v.string(),
+    token: v.string(),
+  },
   handler: async (ctx, args) => {
+    await requireSesionModel(ctx, args.token);
     return crearRecordatorioModel(ctx, args);
   },
 });
 
-// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
-// construido todavía. Desplegada igualmente en Railway con este riesgo
-// aceptado explícitamente desde 2026-07-12 — ver README.md. JOS-22 (17 jul
-// 2026): edita fecha/motivo de un recordatorio pendiente ya existente. Exige
-// `clienteId` además de `recordatorioId` para verificar pertenencia en
-// servidor — mitigación de contrato, no un control de autorización real (sin
-// auth, cualquiera que conozca ambos ids podría seguir editando).
+// JOS-22 (17 jul 2026): edita fecha/motivo de un recordatorio pendiente ya
+// existente. Exige `clienteId` además de `recordatorioId` para verificar
+// pertenencia en servidor.
 export const actualizarRecordatorio = mutation({
   args: {
     recordatorioId: v.id("recordatorios"),
     clienteId: v.id("clientes"),
     fecha: v.string(),
     motivo: v.string(),
+    token: v.string(),
   },
   handler: async (ctx, args) => {
+    await requireSesionModel(ctx, args.token);
     return actualizarRecordatorioModel(ctx, args);
   },
 });
 
-// Pública y sin autenticación/scoping por usuario: login (JOS-60/61) no está
-// construido todavía. Desplegada igualmente en Railway con este riesgo
-// aceptado explícitamente desde 2026-07-12 — ver README.md. Es la función
-// pública más sensible de las cuatro (modifica estado), así que este aviso
-// va explícito aquí, no solo en las de solo lectura.
-// JOS-24 (F9): marcar un recordatorio como hecho. Genérica y reutilizable desde
-// P3 (ficha de cliente) más adelante, no solo desde P1. Idempotente: si ya está
-// "hecho", no es un error, simplemente no hace nada. Valida que el recordatorio
-// exista; no confía en que el cliente solo envíe ids de tareas visibles.
+// JOS-24 (F9): marcar un recordatorio como hecho. Idempotente: si ya está
+// "hecho", no es un error, simplemente no hace nada.
 export const marcarComoHecho = mutation({
-  args: { recordatorioId: v.id("recordatorios") },
-  handler: async (ctx, { recordatorioId }) => {
+  args: { recordatorioId: v.id("recordatorios"), token: v.string() },
+  handler: async (ctx, { recordatorioId, token }) => {
+    await requireSesionModel(ctx, token);
     const recordatorio = await ctx.db.get(recordatorioId);
     if (!recordatorio) {
       throw new ConvexError("Recordatorio no encontrado");

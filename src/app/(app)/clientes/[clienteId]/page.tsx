@@ -1,7 +1,8 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { fetchQuery } from "convex/nextjs";
 import { ConvexError } from "convex/values";
 import { api } from "../../../../../convex/_generated/api";
+import { getSesionActual } from "@/lib/session";
 import type { ClienteListado } from "@/components/clientes/ClienteRow";
 import { ClienteFichaClient } from "@/components/clientes/ClienteFichaClient";
 
@@ -12,11 +13,18 @@ export default async function FichaClientePage({
 }: {
   params: Promise<{ clienteId: string }>;
 }) {
+  const sesion = await getSesionActual();
+  if (!sesion) redirect("/");
+
   const { clienteId } = await params;
+  const { token } = sesion;
 
   let cliente: ClienteListado;
   try {
-    cliente = await fetchQuery(api.clientes.obtenerCliente, { clienteId });
+    cliente = await fetchQuery(api.clientes.obtenerCliente, {
+      clienteId,
+      token,
+    });
   } catch (err) {
     // Solo el caso de negocio esperado ("Cliente no encontrado" — id con
     // formato inválido o cliente inexistente, ver convex/model/clientes.ts:
@@ -34,8 +42,14 @@ export default async function FichaClientePage({
   // toman v.id("clientes") validado (cliente._id), no el clienteId crudo de
   // la URL.
   const [interacciones, recordatoriosPendientes] = await Promise.all([
-    fetchQuery(api.interacciones.listarInteracciones, { clienteId: cliente._id }),
-    fetchQuery(api.recordatorios.listarRecordatoriosPendientes, { clienteId: cliente._id }),
+    fetchQuery(api.interacciones.listarInteracciones, {
+      clienteId: cliente._id,
+      token,
+    }),
+    fetchQuery(api.recordatorios.listarRecordatoriosPendientes, {
+      clienteId: cliente._id,
+      token,
+    }),
   ]);
 
   return (

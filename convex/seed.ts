@@ -4,8 +4,16 @@
 // veces da el mismo dataset determinista, para que KPIs/inactivos/recordatorios no
 // se dupliquen entre corridas de verificación.
 import { internalMutation } from "./_generated/server";
+import { hashPassword } from "./model/auth";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+// JOS-60: contraseña de desarrollo compartida por los 2 usuarios demo —
+// documentada también en README.md. Única forma de aprovisionar cuentas
+// mientras no exista JOS-62 (P9, alta de usuarios) — validar duplicados de
+// email en altas reales es responsabilidad de ese ticket, este seed siempre
+// parte de una tabla vacía.
+const DEV_PASSWORD = "DevVibe2026!";
 
 function daysAgoMs(days: number): number {
   return Date.now() - days * DAY_MS;
@@ -25,6 +33,15 @@ export const seedDemoData = internalMutation({
       await ctx.db.delete(doc._id);
     }
     for (const doc of await ctx.db.query("clientes").collect()) {
+      await ctx.db.delete(doc._id);
+    }
+    for (const doc of await ctx.db.query("intentos_login").collect()) {
+      await ctx.db.delete(doc._id);
+    }
+    for (const doc of await ctx.db.query("sesiones").collect()) {
+      await ctx.db.delete(doc._id);
+    }
+    for (const doc of await ctx.db.query("usuarios").collect()) {
       await ctx.db.delete(doc._id);
     }
 
@@ -119,6 +136,27 @@ export const seedDemoData = internalMutation({
       motivo: "Enviar factura final",
       fecha: daysAgoISO(3),
       estado: "hecho",
+    });
+
+    // JOS-60: 2 usuarios demo, únicas cuentas existentes al no haber P9 (JOS-62)
+    // todavía. Nombres deliberadamente distintos de los clientes demo de arriba,
+    // para no confundir un usuario con un cliente en el mismo dataset.
+    const passwordHash = await hashPassword(DEV_PASSWORD);
+    await ctx.db.insert("usuarios", {
+      nombre_completo: "Marta Aguilar",
+      email: "marta@vibecrm.dev",
+      password_hash: passwordHash,
+      rol: "duena",
+      estado: "activo",
+      fecha_alta: Date.now(),
+    });
+    await ctx.db.insert("usuarios", {
+      nombre_completo: "Diego Romero",
+      email: "diego@vibecrm.dev",
+      password_hash: passwordHash,
+      rol: "comercial",
+      estado: "activo",
+      fecha_alta: Date.now(),
     });
   },
 });

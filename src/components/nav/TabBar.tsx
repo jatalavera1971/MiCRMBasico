@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
+import { LogOut } from "lucide-react";
+import { logoutAction } from "@/components/auth/actions";
 import { navItems } from "./nav-items";
 
 export function TabBar() {
@@ -39,6 +41,18 @@ export function TabBar() {
           </Link>
         );
       })}
+      {/* TODO(JOS-63): botón mínimo y temporal — P10 lo sustituye. */}
+      <button
+        type="button"
+        onClick={async () => {
+          await logoutAction();
+          window.location.href = "/";
+        }}
+        className="flex flex-1 flex-col items-center justify-center gap-0.5"
+      >
+        <LogOut className="h-[22px] w-[22px] text-text-tertiary" strokeWidth={1.5} />
+        <span className="text-[10px] font-normal text-text-tertiary">Salir</span>
+      </button>
     </nav>
   );
 }

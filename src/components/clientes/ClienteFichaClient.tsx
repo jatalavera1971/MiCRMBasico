@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMutation } from "convex/react";
 import {
   ArrowLeft,
   Building2,
@@ -17,8 +16,14 @@ import {
   Plus,
   type LucideIcon,
 } from "lucide-react";
-import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import {
+  actualizarCanalPreferidoAction,
+  actualizarFaseAction,
+  actualizarPrioridadAction,
+  eliminarClienteAction,
+} from "@/lib/actions/clientes";
+import { marcarComoHechoAction } from "@/lib/actions/recordatorios";
 import { getInitials, type ClienteListado } from "./ClienteRow";
 import {
   CANAL_LABELS,
@@ -100,11 +105,6 @@ export function ClienteFichaClient({
   const [recordatoriosExpandido, setRecordatoriosExpandido] = useState(false);
   const [confirmHechoTarget, setConfirmHechoTarget] =
     useState<RecordatorioPendiente | null>(null);
-  const actualizarCanalPreferido = useMutation(api.clientes.actualizarCanalPreferido);
-  const actualizarPrioridad = useMutation(api.clientes.actualizarPrioridad);
-  const actualizarFase = useMutation(api.clientes.actualizarFase);
-  const eliminarCliente = useMutation(api.clientes.eliminarCliente);
-  const marcarComoHecho = useMutation(api.recordatorios.marcarComoHecho);
 
   // Decisión 19 (plan JOS-18/19/20/21): useState(clienteInicial) solo toma el
   // valor inicial una vez — sin esto, un router.refresh() que traiga un
@@ -142,7 +142,11 @@ export function ClienteFichaClient({
     const anterior = cliente.canal_preferido;
     setCliente((c) => ({ ...c, canal_preferido: key }));
     try {
-      await actualizarCanalPreferido({ clienteId: cliente._id, canal_preferido: key });
+      const result = await actualizarCanalPreferidoAction({
+        clienteId: cliente._id,
+        canal_preferido: key,
+      });
+      if (!result.ok) throw new Error(result.error);
       setToast(`Canal preferido: ${label}`);
     } catch {
       setCliente((c) => ({ ...c, canal_preferido: anterior }));
@@ -160,7 +164,11 @@ export function ClienteFichaClient({
     setSavingFase(true);
     setCliente((c) => ({ ...c, fase: nueva }));
     try {
-      await actualizarFase({ clienteId: cliente._id, fase: nueva });
+      const result = await actualizarFaseAction({
+        clienteId: cliente._id,
+        fase: nueva,
+      });
+      if (!result.ok) throw new Error(result.error);
       setToast(`Fase: ${FASE_LABELS[nueva]}`);
     } catch {
       setCliente((c) => ({ ...c, fase: anterior }));
@@ -177,7 +185,11 @@ export function ClienteFichaClient({
     }
     setSavingPrioridad(true);
     try {
-      await actualizarPrioridad({ clienteId: cliente._id, prioridad: nueva });
+      const result = await actualizarPrioridadAction({
+        clienteId: cliente._id,
+        prioridad: nueva,
+      });
+      if (!result.ok) throw new Error(result.error);
       setCliente((c) => ({ ...c, prioridad: nueva }));
       setToast("Prioridad actualizada");
       setPrioritySheetOpen(false);
@@ -202,7 +214,8 @@ export function ClienteFichaClient({
     setConfirmDeleteOpen(false);
     setDeleting(true);
     try {
-      await eliminarCliente({ clienteId: cliente._id });
+      const result = await eliminarClienteAction({ clienteId: cliente._id });
+      if (!result.ok) throw new Error(result.error);
       setToast("Cliente eliminado");
       // Breve delay para que el toast sea visible antes de navegar fuera de
       // esta pantalla; router.refresh() evita servir /clientes cacheado.
@@ -248,7 +261,8 @@ export function ClienteFichaClient({
     const target = confirmHechoTarget;
     setConfirmHechoTarget(null);
     try {
-      await marcarComoHecho({ recordatorioId: target._id });
+      const result = await marcarComoHechoAction({ recordatorioId: target._id });
+      if (!result.ok) throw new Error(result.error);
       setToast("Recordatorio completado");
       router.refresh();
     } catch {

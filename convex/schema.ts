@@ -83,4 +83,48 @@ export default defineSchema({
     // al crear el recordatorio automático, sin conversión).
     proximo_paso_fecha: v.optional(v.string()),
   }).index("by_cliente_id", ["cliente_id"]),
+
+  // JOS-60: entidad Usuario (Dueña/Comercial). Sin mutation de alta pública
+  // esta ronda (JOS-62/P9 no está construido) — las únicas filas hoy vienen
+  // del seed. by_email no impone unicidad real (Convex no tiene constraint
+  // nativo) — el seed siempre parte de una tabla vacía, así que no es
+  // explotable hoy, pero cualquier alta futura (JOS-62) deberá comprobar
+  // duplicados explícitamente antes de insertar.
+  usuarios: defineTable({
+    nombre_completo: v.string(),
+    // Normalizado a minúsculas en el servidor, mismo patrón que clientes.email (JOS-12).
+    email: v.string(),
+    // Formato autodescriptivo "pbkdf2$<iteraciones>$<saltHex>$<hashHex>" — ver
+    // convex/model/auth.ts. Nunca en claro.
+    password_hash: v.string(),
+    rol: v.union(v.literal("duena"), v.literal("comercial")),
+    // Inactivo pierde acceso de inmediato (revisado en cada request, no solo
+    // al hacer login) pero se conserva, no hay borrado definitivo.
+    estado: v.union(v.literal("activo"), v.literal("inactivo")),
+    fecha_alta: v.number(),
+  }).index("by_email", ["email"]),
+
+  // JOS-60: token opaco de sesión (JAMÁS se guarda en claro, solo su SHA-256
+  // en token_hash) — el valor real vive únicamente en la cookie httpOnly del
+  // navegador. 30 días fijos desde el login, sin renovación deslizante.
+  sesiones: defineTable({
+    usuario_id: v.id("usuarios"),
+    token_hash: v.string(),
+    creado_en: v.number(),
+    expira_en: v.number(),
+  })
+    .index("by_token_hash", ["token_hash"])
+    .index("by_usuario_id", ["usuario_id"])
+    // Para limpiarSesionesExpiradas (cron diario) — evita escanear la tabla completa.
+    .index("by_expira_en", ["expira_en"]),
+
+  // JOS-60/JOS-61: rate-limit best-effort de intentos fallidos de login, por
+  // email exacto (no agregado por IP). Ver convex/model/auth.ts: se lee con
+  // .first(), nunca .unique() — un duplicado externo (seed/edición manual) no
+  // debe poder romper el login.
+  intentos_login: defineTable({
+    email: v.string(),
+    ventana_inicio: v.number(),
+    conteo: v.number(),
+  }).index("by_email", ["email"]),
 });

@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useMutation } from "convex/react";
-import { ConvexError } from "convex/values";
-import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { crearClienteAction } from "@/lib/actions/clientes";
 import {
   EMAIL_RE,
   Field,
@@ -32,7 +30,6 @@ export function NewClientDialog({
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const nombreRef = useRef<HTMLInputElement>(null);
-  const crearCliente = useMutation(api.clientes.crearCliente);
 
   const [form, setForm] = useState(initialState);
   const [guardando, setGuardando] = useState(false);
@@ -86,20 +83,21 @@ export function NewClientDialog({
     setErrors({});
     setGuardando(true);
     try {
-      const id = await crearCliente({
+      const result = await crearClienteAction({
         nombre,
         email,
         empresa: form.empresa.trim() || undefined,
         telefono: form.telefono.trim() || undefined,
         prioridad: form.prioridad,
       });
-      onCreated(id);
-    } catch (err) {
-      const message =
-        err instanceof ConvexError
-          ? String(err.data)
-          : "No se pudo crear el cliente. Inténtalo de nuevo.";
-      setErrors({ general: message });
+      if (!result.ok) {
+        setErrors({ general: result.error });
+        setGuardando(false);
+        return;
+      }
+      onCreated(result.id);
+    } catch {
+      setErrors({ general: "No se pudo crear el cliente. Inténtalo de nuevo." });
       setGuardando(false);
     }
   }

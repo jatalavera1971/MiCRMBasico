@@ -2,10 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation } from "convex/react";
-import { ConvexError } from "convex/values";
 import { ArrowLeft } from "lucide-react";
-import { api } from "../../../convex/_generated/api";
+import { actualizarClienteAction } from "@/lib/actions/clientes";
 import type { ClienteListado } from "./ClienteRow";
 import { EMAIL_RE, Field, getInputClassName, PrioritySelector } from "./ClientFormFields";
 import { Toast } from "@/components/ui/Toast";
@@ -17,7 +15,6 @@ import { Toast } from "@/components/ui/Toast";
 // guardar-con-éxito navegan siempre a la ficha directamente (no router.back()).
 export function EditClientForm({ cliente }: { cliente: ClienteListado }) {
   const router = useRouter();
-  const actualizarCliente = useMutation(api.clientes.actualizarCliente);
   const fichaHref = `/clientes/${encodeURIComponent(cliente._id)}`;
 
   const [form, setForm] = useState({
@@ -65,7 +62,7 @@ export function EditClientForm({ cliente }: { cliente: ClienteListado }) {
     setErrors({});
     setGuardando(true);
     try {
-      await actualizarCliente({
+      const result = await actualizarClienteAction({
         clienteId: cliente._id,
         nombre,
         email,
@@ -73,17 +70,20 @@ export function EditClientForm({ cliente }: { cliente: ClienteListado }) {
         telefono: form.telefono.trim() || undefined,
         prioridad: form.prioridad,
       });
+      if (!result.ok) {
+        setErrors({ general: result.error });
+        setGuardando(false);
+        return;
+      }
       setToast("Cambios guardados");
       setTimeout(() => {
         router.refresh();
         router.push(fichaHref);
       }, 700);
-    } catch (err) {
-      const message =
-        err instanceof ConvexError
-          ? String(err.data)
-          : "No se pudieron guardar los cambios. Inténtalo de nuevo.";
-      setErrors({ general: message });
+    } catch {
+      setErrors({
+        general: "No se pudieron guardar los cambios. Inténtalo de nuevo.",
+      });
       setGuardando(false);
     }
   }

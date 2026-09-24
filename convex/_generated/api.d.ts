@@ -17,10 +17,12 @@ import type * as model_auth from "../model/auth.js";
 import type * as model_clientes from "../model/clientes.js";
 import type * as model_interacciones from "../model/interacciones.js";
 import type * as model_recordatorios from "../model/recordatorios.js";
+import type * as model_usuarios from "../model/usuarios.js";
 import type * as model_validacionFechas from "../model/validacionFechas.js";
 import type * as recordatorios from "../recordatorios.js";
 import type * as seed from "../seed.js";
 import type * as seedPerf from "../seedPerf.js";
+import type * as usuarios from "../usuarios.js";
 
 import type {
   ApiFromModules,
@@ -38,10 +40,12 @@ declare const fullApi: ApiFromModules<{
   "model/clientes": typeof model_clientes;
   "model/interacciones": typeof model_interacciones;
   "model/recordatorios": typeof model_recordatorios;
+  "model/usuarios": typeof model_usuarios;
   "model/validacionFechas": typeof model_validacionFechas;
   recordatorios: typeof recordatorios;
   seed: typeof seed;
   seedPerf: typeof seedPerf;
+  usuarios: typeof usuarios;
 }>;
 
 /**

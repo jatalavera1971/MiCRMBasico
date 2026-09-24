@@ -127,4 +127,15 @@ export default defineSchema({
     ventana_inicio: v.number(),
     conteo: v.number(),
   }).index("by_email", ["email"]),
+
+  // JOS-63: rate-limit best-effort de intentos fallidos al verificar la
+  // contraseña actual en cambiarPassword — mismo patrón que intentos_login,
+  // pero por usuario_id (ya hay sesión autenticada, no hace falta derivar
+  // email). Comparte contador entre todas las sesiones activas de ese
+  // usuario (auditoría del plan): no es per-sesión.
+  intentos_cambio_password: defineTable({
+    usuario_id: v.id("usuarios"),
+    ventana_inicio: v.number(),
+    conteo: v.number(),
+  }).index("by_usuario_id", ["usuario_id"]),
 });

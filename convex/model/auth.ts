@@ -1,5 +1,5 @@
 import { ConvexError } from "convex/values";
-import type { Doc } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 
 // JOS-60/61: hash de contraseña vía Web Crypto (crypto.subtle, PBKDF2-HMAC-
@@ -272,6 +272,113 @@ export async function requireSesion(ctx: QueryCtx, token: string) {
     throw new ConvexError("No autenticado");
   }
   return sesion;
+}
+
+async function registrarIntentoCambioPasswordFallido(
+  ctx: MutationCtx,
+  usuarioId: Id<"usuarios">,
+  intentoActual: Doc<"intentos_cambio_password"> | null,
+  ahora: number,
+) {
+  if (!intentoActual) {
+    await ctx.db.insert("intentos_cambio_password", {
+      usuario_id: usuarioId,
+      ventana_inicio: ahora,
+      conteo: 1,
+    });
+    return;
+  }
+  if (ahora - intentoActual.ventana_inicio >= LOCKOUT_VENTANA_MS) {
+    await ctx.db.patch(intentoActual._id, { ventana_inicio: ahora, conteo: 1 });
+  } else {
+    await ctx.db.patch(intentoActual._id, { conteo: intentoActual.conteo + 1 });
+  }
+}
+
+const CAMBIO_PASSWORD_MIN = 8;
+const MENSAJE_PASSWORD_ACTUAL_INCORRECTA = "La contraseña actual no es correcta";
+
+type CambiarPasswordResultado = { ok: true } | { ok: false; error: string };
+
+// JOS-63: cambio de contraseña de la cuenta propia (Perfil). Mismo motivo y
+// misma disciplina que login (auditoría del plan, ronda 2): NUNCA lanza para
+// un fallo de negocio esperado (contraseña actual incorrecta, lockout,
+// contraseña nueva demasiado corta) — Convex revierte toda la transacción si
+// la mutation lanza, así que un throw aquí perdería la escritura del
+// contador de intentos fallidos, igual que le pasaba a login antes de
+// corregirlo. Solo se lanza ConvexError para una anomalía real e inesperada
+// (usuario inexistente pese a venir de una sesión ya validada) — nunca se
+// disfraza un fallo de infraestructura de "contraseña incorrecta".
+//
+// Límite de intentos (auditoría del plan, ronda 2): sin él, una sesión ya
+// autenticada podría probar contraseñas indefinidamente contra este
+// endpoint, sin pasar por el lockout de login, cargando PBKDF2 de 600.000
+// iteraciones en cada intento. Mismo contador (10 intentos/15min) que login,
+// pero por usuario_id — se comparte entre todas las sesiones activas de esa
+// persona, no es per-sesión.
+export async function cambiarPassword(
+  ctx: MutationCtx,
+  args: {
+    usuarioId: Id<"usuarios">;
+    passwordActual: string;
+    passwordNueva: string;
+  },
+): Promise<CambiarPasswordResultado> {
+  if (!args.passwordActual || args.passwordActual.length > PASSWORD_MAX) {
+    return { ok: false, error: MENSAJE_PASSWORD_ACTUAL_INCORRECTA };
+  }
+  if (!args.passwordNueva) {
+    return { ok: false, error: MENSAJE_PASSWORD_ACTUAL_INCORRECTA };
+  }
+  // Mensaje propio para "demasiado larga" (auditoría del código, ronda 1):
+  // a diferencia de "contraseña actual incorrecta", el límite de longitud de
+  // la NUEVA no es información sensible que haya que ocultar — ya es público
+  // en el propio formulario — y colapsarlo en el mismo mensaje que un fallo
+  // de autenticación solo confundía a quien lo usaba sin ganar nada en
+  // seguridad. Sigue comprobándose antes de tocar BD o crypto.
+  if (args.passwordNueva.length > PASSWORD_MAX) {
+    return { ok: false, error: "La contraseña no puede superar los 200 caracteres" };
+  }
+
+  const usuario = await ctx.db.get(args.usuarioId);
+  if (!usuario) {
+    // Estado imposible en la práctica (usuarioId viene siempre de una sesión
+    // ya validada por requireSesion) — si ocurre, es una anomalía real, no
+    // se disfraza de "contraseña incorrecta".
+    throw new ConvexError("Usuario no encontrado");
+  }
+
+  const ahora = Date.now();
+  const intento = await ctx.db
+    .query("intentos_cambio_password")
+    .withIndex("by_usuario_id", (q) => q.eq("usuario_id", args.usuarioId))
+    .first();
+  if (
+    intento &&
+    ahora - intento.ventana_inicio < LOCKOUT_VENTANA_MS &&
+    intento.conteo >= LOCKOUT_MAX_INTENTOS
+  ) {
+    return { ok: false, error: MENSAJE_PASSWORD_ACTUAL_INCORRECTA };
+  }
+
+  const passwordOk = await verifyPassword(args.passwordActual, usuario.password_hash);
+  if (!passwordOk) {
+    await registrarIntentoCambioPasswordFallido(ctx, args.usuarioId, intento, ahora);
+    return { ok: false, error: MENSAJE_PASSWORD_ACTUAL_INCORRECTA };
+  }
+
+  if (intento) {
+    await ctx.db.delete(intento._id);
+  }
+
+  if (args.passwordNueva.length < CAMBIO_PASSWORD_MIN) {
+    return { ok: false, error: "La contraseña debe tener al menos 8 caracteres" };
+  }
+
+  await ctx.db.patch(args.usuarioId, {
+    password_hash: await hashPassword(args.passwordNueva),
+  });
+  return { ok: true };
 }
 
 // No-op real (decisión del usuario, 2026-07-23): sin proveedor de email

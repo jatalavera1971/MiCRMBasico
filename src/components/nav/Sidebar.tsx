@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
-import { LogOut } from "lucide-react";
-import { logoutAction } from "@/components/auth/actions";
+import { UserCircle } from "lucide-react";
 import { navItems } from "./nav-items";
 
 export function Sidebar() {
@@ -36,20 +35,19 @@ export function Sidebar() {
           );
         })}
       </div>
-      {/* TODO(JOS-63): botón mínimo y temporal — P10 lo sustituye por la
-          pantalla de perfil (con "Cerrar sesión" junto a los datos del usuario). */}
       <div className="px-3 pb-5">
-        <button
-          type="button"
-          onClick={async () => {
-            await logoutAction();
-            window.location.href = "/";
-          }}
-          className="flex h-12 w-full items-center gap-3 rounded-md border-l-[3px] border-transparent px-3 text-sm font-normal text-text-secondary"
+        <Link
+          href="/perfil"
+          className={clsx(
+            "flex h-12 items-center gap-3 rounded-md border-l-[3px] px-3 text-sm",
+            pathname === "/perfil"
+              ? "border-primary-600 bg-primary-50 font-semibold text-primary-700"
+              : "border-transparent font-normal text-text-secondary",
+          )}
         >
-          <LogOut className="h-5 w-5" strokeWidth={1.5} />
-          Cerrar sesión
-        </button>
+          <UserCircle className="h-5 w-5" strokeWidth={1.5} />
+          Perfil
+        </Link>
       </div>
     </nav>
   );

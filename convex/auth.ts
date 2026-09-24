@@ -1,10 +1,12 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import {
+  cambiarPassword as cambiarPasswordModel,
   limpiarSesionesExpiradas as limpiarSesionesExpiradasModel,
   login as loginModel,
   logout as logoutModel,
   obtenerSesionActual as obtenerSesionActualModel,
+  requireSesion as requireSesionModel,
   solicitarResetPassword as solicitarResetPasswordModel,
 } from "./model/auth";
 
@@ -48,6 +50,27 @@ export const solicitarResetPassword = mutation({
   args: { email: v.string() },
   handler: async (ctx, args) => {
     return solicitarResetPasswordModel(ctx, args);
+  },
+});
+
+// JOS-63 (Perfil): usuarioId viene EXCLUSIVAMENTE de la sesión (requireSesion),
+// nunca del cliente — los únicos argumentos públicos son token y las dos
+// contraseñas (auditoría del plan, ronda 3). cambiarPasswordModel nunca lanza
+// para un fallo de negocio esperado (ver convex/model/auth.ts): el resultado
+// ya es {ok:false, error} tal cual, mismo contrato que login.
+export const cambiarPassword = mutation({
+  args: {
+    passwordActual: v.string(),
+    passwordNueva: v.string(),
+    token: v.string(),
+  },
+  handler: async (ctx, { passwordActual, passwordNueva, token }) => {
+    const sesion = await requireSesionModel(ctx, token);
+    return cambiarPasswordModel(ctx, {
+      usuarioId: sesion.usuarioId,
+      passwordActual,
+      passwordNueva,
+    });
   },
 });
 

@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
-import { LogOut } from "lucide-react";
-import { logoutAction } from "@/components/auth/actions";
+import { UserCircle } from "lucide-react";
 import { navItems } from "./nav-items";
 
 export function TabBar() {
@@ -41,18 +40,28 @@ export function TabBar() {
           </Link>
         );
       })}
-      {/* TODO(JOS-63): botón mínimo y temporal — P10 lo sustituye. */}
-      <button
-        type="button"
-        onClick={async () => {
-          await logoutAction();
-          window.location.href = "/";
-        }}
+      <Link
+        href="/perfil"
         className="flex flex-1 flex-col items-center justify-center gap-0.5"
       >
-        <LogOut className="h-[22px] w-[22px] text-text-tertiary" strokeWidth={1.5} />
-        <span className="text-[10px] font-normal text-text-tertiary">Salir</span>
-      </button>
+        <UserCircle
+          className={clsx(
+            "h-[22px] w-[22px]",
+            pathname === "/perfil" ? "text-primary-600" : "text-text-tertiary",
+          )}
+          strokeWidth={1.5}
+        />
+        <span
+          className={clsx(
+            "text-[10px]",
+            pathname === "/perfil"
+              ? "font-semibold text-primary-600"
+              : "font-normal text-text-tertiary",
+          )}
+        >
+          Perfil
+        </span>
+      </Link>
     </nav>
   );
 }

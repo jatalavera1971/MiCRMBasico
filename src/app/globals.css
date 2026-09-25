@@ -73,6 +73,13 @@
    * sobre sheetNewClient(), que no tiene estados de foco en el prototipo. */
   --color-focus-ring: #bbf7d0;
 
+  /* JOS-62: texto del badge "Comercial" en /usuarios — transcrito de sAdmin()
+   * en shared/crm-app.js. El resto del badge de rol ya existe
+   * (--color-primary-600 + blanco para "Dueña", --color-border-subtle para
+   * el fondo de "Comercial"); solo faltaba este gris de texto, distinto de
+   * --color-text-secondary (#4b5563). */
+  --color-role-comercial-text: #6b7280;
+
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-full: 9999px;

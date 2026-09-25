@@ -102,6 +102,17 @@ export default defineSchema({
     // al hacer login) pero se conserva, no hay borrado definitivo.
     estado: v.union(v.literal("activo"), v.literal("inactivo")),
     fecha_alta: v.number(),
+    // JOS-62 (auditoría del código, ronda 4 — bloqueante): invalidación
+    // LÓGICA de sesiones, no solo física. desactivarUsuario la fija a
+    // Date.now() — cualquier sesión con creado_en anterior a esta marca se
+    // rechaza en obtenerSesionActual, exista o no todavía la fila en
+    // `sesiones`. Esto es lo que realmente garantiza que ninguna sesión
+    // previa a una desactivación pueda "resucitar" al reactivar, sea cual
+    // sea el volumen de sesiones que tuviera el usuario — el borrado físico
+    // (acotado, ver model/usuarios.ts) pasa a ser solo limpieza de
+    // almacenamiento, no el mecanismo de seguridad. undefined = nunca
+    // invalidado (cuentas que jamás se han desactivado).
+    sesion_valida_desde: v.optional(v.number()),
   }).index("by_email", ["email"]),
 
   // JOS-60: token opaco de sesión (JAMÁS se guarda en claro, solo su SHA-256

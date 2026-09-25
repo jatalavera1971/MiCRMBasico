@@ -242,6 +242,29 @@ export async function logout(ctx: MutationCtx, args: { token: string }) {
 // Nunca devuelve password_hash. Cuenta "inactivo" revoca el acceso de
 // inmediato aunque la sesión siga técnicamente vigente (comprobado en cada
 // llamada, no solo al hacer login).
+//
+// Invalidación LÓGICA por sesion_valida_desde (auditoría del código, ronda 4
+// — bloqueante): una sesión con creado_en anterior O IGUAL a esa marca se
+// rechaza aquí SIEMPRE, exista o no todavía su fila en `sesiones` — un
+// borrado físico incompleto (por volumen, por el cap de model/usuarios.ts,
+// o por lo que sea) ya no puede dejar una sesión antigua "resucitada" tras
+// reactivar: esta comprobación no depende de cuántas filas se hayan podido
+// borrar de verdad.
+//
+// Comparación INCLUSIVA (`<=`, auditoría del código, ronda 5 — bloqueante):
+// Date.now() tiene resolución de milisegundo, y Convex serializa las
+// mutations una a una pero no garantiza que dos lecturas de Date.now() en
+// mutations consecutivas caigan en milisegundos distintos — un login y una
+// desactivarUsuario ejecutados de forma consecutiva y muy rápida podrían
+// leer el mismo valor. Con `<` (estricto), una sesión creada exactamente en
+// el mismo milisegundo que la desactivación pasaría la comprobación sin
+// invalidarse. Con `<=`, ese empate se resuelve siempre hacia "inválida" —
+// no hay ninguna sesión legítima que dependa de coincidir al milisegundo
+// exacto con su propia desactivación, así que no hay coste real en falsos
+// rechazos: un login posterior legítimo (tras reactivar) ocurre en un
+// instante muy distinto al de la desactivación original, nunca en el mismo
+// milisegundo por construcción del flujo (siempre hay una reactivación de
+// por medio).
 export async function obtenerSesionActual(
   ctx: QueryCtx,
   args: { token: string },
@@ -255,6 +278,12 @@ export async function obtenerSesionActual(
   if (!sesion || sesion.expira_en < Date.now()) return null;
   const usuario = await ctx.db.get(sesion.usuario_id);
   if (!usuario || usuario.estado === "inactivo") return null;
+  if (
+    usuario.sesion_valida_desde !== undefined &&
+    sesion.creado_en <= usuario.sesion_valida_desde
+  ) {
+    return null;
+  }
   return {
     usuarioId: usuario._id,
     nombreCompleto: usuario.nombre_completo,
@@ -272,6 +301,23 @@ export async function requireSesion(ctx: QueryCtx, token: string) {
     throw new ConvexError("No autenticado");
   }
   return sesion;
+}
+
+// JOS-62: guard de rol — usado individualmente por las 5 funciones de
+// administración de usuarios en convex/usuarios.ts (auditoría del plan:
+// no basta con que la página redirija, cada función pública debe exigir el
+// rol por sí misma). Reutiliza requireSesion, que a su vez llama a
+// obtenerSesionActual y por tanto RELEE `rol` desde el documento de usuario
+// en cada invocación (nunca se cachea en la sesión — la tabla `sesiones`
+// solo guarda usuario_id/token_hash/creado_en/expira_en) — si a alguien le
+// quitan el rol "duena" con un token ya activo, la siguiente llamada ya lo
+// rechaza, no hace falta esperar a que expire la sesión.
+export async function requireRolDuena(ctx: QueryCtx, token: string) {
+  const sesion = await requireSesion(ctx, token);
+  if (sesion.rol !== "duena") {
+    throw new ConvexError("Solo la Dueña puede acceder a esta sección");
+  }
+  return sesion; // incluye usuarioId — lo necesitan actualizarUsuario/desactivarUsuario
 }
 
 async function registrarIntentoCambioPasswordFallido(
